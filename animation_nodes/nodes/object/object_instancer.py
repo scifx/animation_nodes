@@ -278,7 +278,10 @@ class ObjectInstancerNode(bpy.types.Node, AnimationNode):
         instanceData = self.getSourceObjectData(sourceObject)
         if self.copyObjectProperties and self.copyFromSource:
             newObject = sourceObject.copy()
-            newObject.data = instanceData
+            # The following check is due to https://developer.blender.org/T67857
+            # The bug is fixed. This should be removed when 2.81 is released.
+            if instanceData:
+                newObject.data = instanceData
         else:
             newObject = self.createObject(name, instanceData)
 
