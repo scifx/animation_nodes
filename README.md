@@ -70,7 +70,7 @@ So I tried to add some fun and crazy node extensions.
 
 There are two types of versions, the regular and geek versions. The difference is that the geek version will have more nodes and rely on third-party python libraries. If you decide to use the geek version, you have to solve the dependency problem first, which means you have to install the corresponding python library first.
 
-Normal installation method:
+Regular version installation method:
 You only need to download animation_nodes_fx.zip and install it in the usual way.
 
 Geek version installation method:
