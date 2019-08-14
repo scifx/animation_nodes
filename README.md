@@ -25,6 +25,7 @@ So why not do it?
 So I tried to add some fun and crazy node extensions.
 
 ------
+![Preview](https://scifx.github.io/images/Fx_nodes.png)
 
 ## 新增节点列表(The list of new nodes)
 
