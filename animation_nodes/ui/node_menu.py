@@ -33,6 +33,10 @@ def drawMenu(self, context):
     layout.menu("AN_MT_spline_menu", text = "Spline", icon = "CURVE_DATA")
     layout.menu("AN_MT_particle_system_menu", text = "Particle System", icon = "PARTICLE_DATA")
     layout.separator()
+    #-----------------------------------------------------------
+    layout.menu("an_fx_menu", text = "Fx", icon = "FONTPREVIEW")
+    #-----------------------------------------------------------
+    layout.separator()
     layout.menu("AN_MT_animation_menu", text = "Animation", icon = "RENDER_ANIMATION")
     layout.menu("AN_MT_interpolation_menu", text = "Interpolation", icon = "IPO_BEZIER")
     layout.menu("AN_MT_falloff_menu", text = "Falloff", icon = "SMOOTHCURVE")
@@ -61,6 +65,43 @@ def drawNodeTreeChooser(layout, context):
 def createNodeTree():
     tree = bpy.data.node_groups.new("AN Tree", "an_AnimationNodeTree")
     bpy.context.space_data.node_tree = tree
+
+#----------------------------------------------------------------
+class FxMenu(bpy.types.Menu):
+    bl_idname = "an_fx_menu"
+    bl_label = "Fx Menu"
+
+    def draw(self, context):
+        layout = self.layout
+        insertNode(layout, "an_fx_SetObjTrans", "Set Object Transforms")
+        insertNode(layout, "an_fx_GetFaceData", "Get Face Data")
+        insertNode(layout, "an_fx_GetNormals", "Get Object Normals")
+        insertNode(layout, "an_fx_SetVertexWeight", "Set Vertex Weight")
+        layout.separator()
+        insertNode(layout, "an_fx_GetParticleData", "Get Particle Data")
+        insertNode(layout, "an_fx_SetParticleData", "Set Particle Data")
+        layout.separator()
+        insertNode(layout, "an_fx_GetPixelCount", "Get Pixel Count")
+        insertNode(layout, "an_fx_GetPixel", "Get Pixel")
+        insertNode(layout, "an_fx_SetPixel", "Set Pixel")
+        layout.separator()
+        insertNode(layout, "an_fx_SelectObj", "Select Object")
+        insertNode(layout, "an_fx_Clipboard", "Get/Set Clipboard")
+        insertNode(layout, "an_fx_FileReader", "File Reader")
+        insertNode(layout, "an_fx_FileWriter", "File Writer")
+        insertNode(layout, "an_fx_JsonReader", "Json Reader")
+        insertNode(layout, "an_fx_Dictionary", "Dictionary")
+        layout.separator()
+        insertNode(layout, "an_fx_Time", "Time")
+        insertNode(layout, "an_fx_email", "Email")
+        insertNode(layout, "an_fx_Serial", "Serial")
+        insertNode(layout, "an_fx_Server", "Server")
+        insertNode(layout, "an_fx_Client", "Client")
+        insertNode(layout, "an_fx_webGet", "Web Get")
+        insertNode(layout, "an_fx_webPost", "Web Post")
+        insertNode(layout, "an_fx_Activator", "Activate")
+        insertNode(layout, "an_fx_Memory", "Memory")
+#-----------------------------------------------------------------
 
 class NumberMenu(bpy.types.Menu):
     bl_idname = "AN_MT_number_menu"
