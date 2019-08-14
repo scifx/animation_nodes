@@ -1,7 +1,5 @@
 # Animation nodes with Fx nodes For Blender 2.8
 
-[TOC]
-
 ## 介绍（Introduction）
 
 这是Animation nodes节点的疯狂版本，它基于 JacquesLucke开发的Animation nodes插件。
