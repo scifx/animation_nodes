@@ -8,6 +8,7 @@
 - Added *Subprograms* to the search menu.
 - Added missing nodes to the node menu
 - Added *Collection Operations* node.
+- Added *Rotations* output to the *Particles Data* node.
 
 ### Fixed
 
@@ -20,6 +21,7 @@
 - Fixed *Material Output* node's color output.
 - Fixed *Create Execution Trigger* operators.
 - Fixed *getSelectedObjectNames* function.
+- Fixed the *Offset Vertices* and *Offset Polygons* nodes. Copy the input mesh if needed.
 
 ### Changed
 
@@ -29,3 +31,4 @@
 - Started following Blender's class naming conventions.
 - Made dependent nodes unsearchable like *Loop Generator* and *Group Output* nodes.
 - Changed location of Animation Nodes to Animation Nodes Editor.
+- Allow spline radius to affect the object's scale in the Follow Spline Action.
