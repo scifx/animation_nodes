@@ -59,14 +59,12 @@ class LinkCorrection:
 
 class SimpleConvert(LinkCorrection):
     rules = {
-        ("Vector", "Matrix") : "an_TranslationMatrixNode",
         ("Text Block", "Text") : "an_TextBlockReaderNode",
         ("Vector", "Float") : "an_SeparateVectorNode",
         ("Float", "Vector") : "an_CombineVectorNode",
         ("Integer", "Vector") : "an_CombineVectorNode",
-        ("Vector List", "Mesh Data") : "an_CombineMeshDataNode",
-        ("Mesh Data", "Vector List") : "an_SeparateMeshDataNode",
-        ("Mesh Data", "BMesh") : "an_CreateBMeshFromMeshDataNode",
+        ("Vector List", "Mesh") : "an_CombineMeshNode",
+        ("Mesh", "BMesh") : "an_CreateBMeshFromMeshNode",
         ("Integer", "Euler") : "an_CombineEulerNode",
         ("Float", "Euler") : "an_CombineEulerNode",
         ("Euler", "Float") : "an_SeparateEulerNode",
@@ -78,9 +76,18 @@ class SimpleConvert(LinkCorrection):
         ("Vector", "Euler") : "an_DirectionToRotationNode",
         ("Euler", "Vector") : "an_RotationToDirectionNode",
         ("Float", "Falloff") : "an_ConstantFalloffNode",
-        ("Vector List", "Matrix List") : "an_TranslationMatrixNode",
         ("Vector List", "Spline") : "an_SplineFromPointsNode",
-        ("Float List", "Falloff") : "an_CustomFalloffNode"
+        ("Float List", "Falloff") : "an_CustomFalloffNode",
+        ("Object", "Mesh") : "an_MeshObjectInputNode",
+        ("Mesh", "Vector List") : "an_MeshInfoNode",
+        ("Matrix List", "Vector List") : "an_DecomposeMatrixNode",
+        ("Polygon Indices List", "Edge Indices List") : "an_EdgesOfPolygonsNode",
+        ("GPLayer", "GPFrame") : "an_GPLayerInfoNode",
+        ("GPFrame", "GPStroke") : "an_GPFrameInfoNode",
+        ("GPStroke", "GPFrame") : "an_GPFrameFromStrokesNode",
+        ("GPStroke List", "GPFrame") : "an_GPFrameFromStrokesNode",
+        ("GPFrame", "GPLayer") : "an_GPLayerFromFramesNode",
+        ("GPFrame List", "GPLayer") : "an_GPLayerFromFramesNode",
     }
 
     def check(self, origin, target):
@@ -91,11 +98,11 @@ class SimpleConvert(LinkCorrection):
         tree_info.updateIfNecessary()
         node.updateNode()
 
-class ConvertMeshDataListToMeshData(LinkCorrection):
+class ConvertMeshListToMesh(LinkCorrection):
     def check(self, origin, target):
-        return origin.dataType == "Mesh Data List" and target.dataType == "Mesh Data"
+        return origin.dataType == "Mesh List" and target.dataType == "Mesh"
     def insert(self, nodeTree, origin, target, dataOrigin):
-        insertLinkedNode(nodeTree, "an_JoinMeshDataListNode", origin, target)
+        insertLinkedNode(nodeTree, "an_JoinMeshListNode", origin, target)
 
 class ConvertFloatToScale(LinkCorrection):
     def check(self, origin, target):
@@ -129,10 +136,18 @@ class ConvertQuaternionToEuler(LinkCorrection):
 
 class ConvertElementToList(LinkCorrection):
     def check(self, origin, target):
-        return origin.bl_idname == toBaseIdName(target.bl_idname)
+        return isList(target.bl_idname) and origin.bl_idname == toBaseIdName(target.bl_idname)
     def insert(self, nodeTree, origin, target, dataOrigin):
         node = insertNode(nodeTree, "an_CreateListNode", origin, target)
         node.assignBaseDataType(dataOrigin.dataType, inputAmount = 1)
+        insertBasicLinking(nodeTree, origin, node, target)
+
+class ConvertListToElement(LinkCorrection):
+    def check(self, origin, target):
+        return isList(origin.bl_idname) and target.dataType != "Integer" and target.bl_idname == toBaseIdName(origin.bl_idname)
+    def insert(self, nodeTree, origin, target, dataOrigin):
+        node = insertNode(nodeTree, "an_GetListElementNode", origin, target)
+        node.assignListDataType(dataOrigin.dataType)
         insertBasicLinking(nodeTree, origin, node, target)
 
 class ConvertObjectToShapeKey(LinkCorrection):
@@ -147,25 +162,15 @@ class ConvertObjectToShapeKey(LinkCorrection):
         getShapeKeys.outputs[0].linkWith(getListElement.inputs[0])
         getListElement.outputs[0].linkWith(target)
 
-class ConvertSeparatedMeshDataToBMesh(LinkCorrection):
-    separatedMeshDataTypes = ["Vector List", "Edge Indices List", "Polygon Indices List"]
+class ConvertSeparatedMeshToBMesh(LinkCorrection):
+    separatedMeshTypes = ["Vector List", "Edge Indices List", "Polygon Indices List"]
     def check(self, origin, target):
-        return origin.dataType in self.separatedMeshDataTypes and target.dataType == "BMesh"
+        return origin.dataType in self.separatedMeshTypes and target.dataType == "BMesh"
     def insert(self, nodeTree, origin, target, dataOrigin):
-        toMeshData, toMesh = insertNodes(nodeTree, ["an_CombineMeshDataNode", "an_CreateBMeshFromMeshDataNode"], origin, target)
-        nodeTree.links.new(toMeshData.inputs[self.separatedMeshDataTypes.index(origin.dataType)], origin)
-        nodeTree.links.new(toMesh.inputs[0], toMeshData.outputs[0])
+        toMesh, toMesh = insertNodes(nodeTree, ["an_CombineMeshNode", "an_CreateBMeshFromMeshNode"], origin, target)
+        nodeTree.links.new(toMesh.inputs[self.separatedMeshTypes.index(origin.dataType)], origin)
+        nodeTree.links.new(toMesh.inputs[0], toMesh.outputs[0])
         nodeTree.links.new(toMesh.outputs[0], target)
-
-class ConvertObjectToMeshData(LinkCorrection):
-    def check(self, origin, target):
-        return origin.dataType == "Object" and target.dataType == "Mesh Data"
-    def insert(self, nodeTree, origin, target, dataOrigin):
-        objectMeshData, toMeshData = insertNodes(nodeTree, ["an_ObjectMeshDataNode", "an_CombineMeshDataNode"], origin, target)
-        origin.linkWith(objectMeshData.inputs[0])
-        for i in range(3):
-            objectMeshData.outputs[i].linkWith(toMeshData.inputs[i])
-        toMeshData.outputs[0].linkWith(target)
 
 class ConvertListToLength(LinkCorrection):
     def check(self, origin, target):
@@ -228,17 +233,18 @@ def getSocketCenter(socket1, socket2):
     return (socket1.node.viewLocation + socket2.node.viewLocation) / 2
 
 linkCorrectors = [
-    ConvertMeshDataListToMeshData(),
+    ConvertMeshListToMesh(),
     ConvertNormalToEuler(),
-    ConvertObjectToMeshData(),
-    ConvertSeparatedMeshDataToBMesh(),
+    ConvertSeparatedMeshToBMesh(),
     ConvertEulerToQuaternion(),
     ConvertQuaternionToEuler(),
     ConvertFloatToScale(),
     ConvertElementToList(),
+    ConvertListToElement(),
     ConvertObjectToShapeKey(),
-	ConvertListToLength(),
+    ConvertListToLength(),
     SimpleConvert(),
     ConvertToText(),
     ConvertFromGenericList(),
-    ConvertFromGeneric() ]
+    ConvertFromGeneric(),
+]

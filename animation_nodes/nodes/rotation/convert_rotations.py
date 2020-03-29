@@ -22,10 +22,10 @@ class ConvertRotationsNode(bpy.types.Node, AnimationNode):
     onlySearchTags = True
     searchTags = [(name, {"conversionType" : repr(type)}) for type, name, _,_,_ in conversionTypeItems]
 
-    conversionType = EnumProperty(name = "Conversion Type", default = "QUATERNION_TO_EULER",
+    conversionType: EnumProperty(name = "Conversion Type", default = "QUATERNION_TO_EULER",
         items = conversionTypeItems, update = AnimationNode.refresh)
 
-    useDegree = BoolProperty(name = "Use Degree", default = False, update = executionCodeChanged)
+    useDegree: BoolProperty(name = "Use Degree", default = False, update = executionCodeChanged)
 
     def create(self):
         if self.conversionType == "QUATERNION_TO_EULER":
@@ -68,14 +68,14 @@ class ConvertRotationsNode(bpy.types.Node, AnimationNode):
         for item in conversionTypeItems:
             if self.conversionType == item[0]: return item[1]
 
-    def getExecutionCode(self):
+    def getExecutionCode(self, required):
         if self.conversionType == "QUATERNION_TO_EULER":
             return "euler = quaternion.to_euler('XYZ')"
         if self.conversionType == "EULER_TO_QUATERNION":
             return "quaternion = euler.to_quaternion()"
 
         if self.conversionType == "QUATERNION_TO_MATRIX":
-            return "matrix = quaternion.to_matrix().to_4x4()"
+            return "matrix = quaternion.normalized().to_matrix().to_4x4()"
         if self.conversionType == "MATRIX_TO_QUATERNION":
             return "quaternion = matrix.to_quaternion()"
 

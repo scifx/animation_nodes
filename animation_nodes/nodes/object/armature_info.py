@@ -14,7 +14,7 @@ class ArmatureInfoNode(bpy.types.Node, AnimationNode):
     bl_idname = "an_ArmatureInfoNode"
     bl_label = "Armature Info"
 
-    state = EnumProperty(name = "State", default = "POSE",
+    state: EnumProperty(name = "State", default = "POSE",
         items = stateItems, update = executionCodeChanged)
 
     def create(self):
@@ -32,21 +32,22 @@ class ArmatureInfoNode(bpy.types.Node, AnimationNode):
     def draw(self, layout):
         layout.prop(self, "state")
 
-    def getExecutionCode(self):
-        isLinked = self.getLinkedOutputsDict()
-        if not any(isLinked.values()): return
+    def getExecutionCode(self, required):
+        if len(required) == 0:
+            return
 
-        loadMatrices = isLinked["matrices"]
-        headsAndTailsRequired = isLinked["directions"] or isLinked["lengths"] or isLinked["centers"]
-        loadHeads = isLinked["heads"] or headsAndTailsRequired
-        loadTails = isLinked["tails"] or headsAndTailsRequired
+        loadMatrices = "matrices" in required
+        headsAndTailsRequired = bool({"directions", "lengths", "centers"}.intersection(required))
+        loadHeads = "heads" in required or headsAndTailsRequired
+        loadTails = "tails" in required or headsAndTailsRequired
 
-        yield "if getattr(armature, 'type', '') == 'ARMATURE':"
+        yield "evaluatedArmature = AN.utils.depsgraph.getEvaluatedID(armature)"
+        yield "if getattr(evaluatedArmature, 'type', '') == 'ARMATURE':"
         if self.state == "REST":
-            yield "    bones = armature.data.bones"
+            yield "    bones = evaluatedArmature.data.bones"
             matrixName = "matrix_local"
         else:
-            yield "    bones = armature.pose.bones"
+            yield "    bones = evaluatedArmature.pose.bones"
             matrixName = "matrix"
 
         if loadMatrices:
@@ -61,19 +62,19 @@ class ArmatureInfoNode(bpy.types.Node, AnimationNode):
             yield "    bones.foreach_get('tail', tails.asMemoryView())"
 
         yield "    if useWorldSpace:"
-        yield "        worldMatrix = armature.matrix_world"
+        yield "        worldMatrix = evaluatedArmature.matrix_world"
         if loadMatrices: yield "        matrices.transform(worldMatrix)"
         if loadHeads:    yield "        heads.transform(worldMatrix)"
         if loadTails:    yield "        tails.transform(worldMatrix)"
 
-        if isLinked["directions"]:
+        if "directions" in required:
             yield "    directions = self.calcDirections(heads, tails)"
-        if isLinked["lengths"]:
+        if "lengths" in required:
             yield "    lengths = self.calcLengths(heads, tails)"
-        if isLinked["centers"]:
+        if "centers" in required:
             yield "    centers = self.calcCenters(heads, tails)"
 
-        if isLinked["names"]:
+        if "names" in required:
             yield "    names = [bone.name for bone in bones]"
 
         yield "else:"

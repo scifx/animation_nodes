@@ -1,9 +1,9 @@
 import bpy
 from bpy.props import *
 from ... events import propertyChanged
-from ... base_types import VectorizedNode
+from ... utils.depsgraph import getEvaluatedID
 from ... algorithms.rotations import eulerToDirection
-from ... data_structures cimport BaseFalloff, DoubleList
+from ... base_types import AnimationNode, VectorizedSocket
 
 from . mix_falloffs import MixFalloffs
 from . invert_falloff import InvertFalloff
@@ -24,26 +24,29 @@ mixListTypeItems = [
 
 axisDirectionItems = [(axis, axis, "") for axis in ("X", "Y", "Z", "-X", "-Y", "-Z")]
 
-class ObjectControllerFalloffNode(bpy.types.Node, VectorizedNode):
+class ObjectControllerFalloffNode(bpy.types.Node, AnimationNode):
     bl_idname = "an_ObjectControllerFalloffNode"
     bl_label = "Object Controller Falloff"
-    bl_width_default = 170
+    bl_width_default = 160
 
-    falloffType = EnumProperty(name = "Falloff Type", items = falloffTypeItems,
-        update = VectorizedNode.refresh)
+    __annotations__ = {}
 
-    axisDirection = EnumProperty(name = "Axis Direction", default = "Z",
+    __annotations__["falloffType"] = EnumProperty(name = "Falloff Type", items = falloffTypeItems,
+        update = AnimationNode.refresh)
+
+    __annotations__["axisDirection"] = EnumProperty(name = "Axis Direction", default = "Z",
         items = axisDirectionItems, update = propertyChanged)
 
-    mixListType = EnumProperty(name = "Mix List Type", default = "MAX",
+    __annotations__["mixListType"] = EnumProperty(name = "Mix List Type", default = "MAX",
         items = mixListTypeItems, update = propertyChanged)
 
-    useObjectList = VectorizedNode.newVectorizeProperty()
+    __annotations__["useObjectList"] = VectorizedSocket.newProperty()
 
     def create(self):
-        self.newVectorizedInput("Object", "useObjectList",
+        self.newInput(VectorizedSocket("Object", "useObjectList",
             ("Object", "object", dict(defaultDrawType = "PROPERTY_ONLY")),
-            ("Objects", "objects"))
+            ("Objects", "objects"),
+            codeProperties = dict(allowListExtension = False)))
 
         if self.falloffType == "SPHERE":
             self.newInput("Float", "Offset", "offset", value = 0)
@@ -89,8 +92,9 @@ class ObjectControllerFalloffNode(bpy.types.Node, VectorizedNode):
     def getSphereFalloff(self, object, offset, falloffWidth):
         if object is None:
             return ConstantFalloff(0)
-
-        matrix = object.matrix_world
+        
+        evaluatedObject = getEvaluatedID(object)
+        matrix = evaluatedObject.matrix_world
         center = matrix.to_translation()
         size = abs(matrix.to_scale().x) + offset
         return PointDistanceFalloff(center, size-1, falloffWidth)
@@ -113,7 +117,8 @@ class ObjectControllerFalloffNode(bpy.types.Node, VectorizedNode):
         if object is None:
             return ConstantFalloff(0)
 
-        matrix = object.matrix_world
+        evaluatedObject = getEvaluatedID(object)
+        matrix = evaluatedObject.matrix_world
         location = matrix.to_translation()
         size = max(matrix.to_scale().x, 0.0001)
         direction = eulerToDirection(matrix.to_euler(), self.axisDirection)

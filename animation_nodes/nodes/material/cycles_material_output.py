@@ -1,6 +1,7 @@
 import bpy
 from bpy.props import *
 from ... base_types import AnimationNode
+from ... utils.enum_items import cacheEnumItems
 
 allowedSocketTypes = {
     "NodeSocketVector" : "an_VectorSocket",
@@ -12,7 +13,7 @@ allowedSocketTypes = {
 class CyclesMaterialOutputNode(bpy.types.Node, AnimationNode):
     bl_idname = "an_CyclesMaterialOutputNode"
     bl_label = "Cycles Material Output"
-    bl_width_default = 165
+    bl_width_default = 160
 
     def getPossibleSocketItems(self, context):
         sockets = self.getPossibleSockets()
@@ -31,9 +32,9 @@ class CyclesMaterialOutputNode(bpy.types.Node, AnimationNode):
                     identifiers.append(socket)
         return identifiers
 
-    materialName = StringProperty(update = AnimationNode.refresh)
-    nodeName = StringProperty(update = AnimationNode.refresh)
-    socketIdentifier = EnumProperty(name = "Socket", items = getPossibleSocketItems,
+    materialName: StringProperty(update = AnimationNode.refresh)
+    nodeName: StringProperty(update = AnimationNode.refresh)
+    socketIdentifier: EnumProperty(name = "Socket", items = cacheEnumItems(getPossibleSocketItems),
         update = AnimationNode.refresh)
 
     def create(self):
@@ -58,7 +59,7 @@ class CyclesMaterialOutputNode(bpy.types.Node, AnimationNode):
         if self.hasPossibleInputs(node):
             layout.prop(self, "socketIdentifier", text = "")
         else:
-            layout.label("No Animatable Inputs", icon = "INFO")
+            layout.label(text = "No Animatable Inputs", icon = "INFO")
 
     def hasPossibleInputs(self, node):
         keys = allowedSocketTypes.keys()
@@ -67,7 +68,7 @@ class CyclesMaterialOutputNode(bpy.types.Node, AnimationNode):
                 return True
         return False
 
-    def getExecutionCode(self):
+    def getExecutionCode(self, required):
         inputSocket = self.inputs.get("Data")
         if inputSocket is None: return
 

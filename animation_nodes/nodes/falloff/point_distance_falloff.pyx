@@ -20,10 +20,10 @@ class PointDistanceFalloffNode(bpy.types.Node, AnimationNode):
 cdef class PointDistanceFalloff(BaseFalloff):
     cdef:
         Vector3 origin
-        double factor
-        double minDistance, maxDistance
+        float factor
+        float minDistance, maxDistance
 
-    def __cinit__(self, vector, double size, double falloffWidth):
+    def __cinit__(self, vector, float size, float falloffWidth):
         if falloffWidth < 0:
             size += falloffWidth
             falloffWidth = -falloffWidth
@@ -35,11 +35,21 @@ cdef class PointDistanceFalloff(BaseFalloff):
         self.factor = 1 / (self.maxDistance - self.minDistance)
         setVector3(&self.origin, vector)
 
-        self.dataType = "Location"
+        self.dataType = "LOCATION"
         self.clamped = True
 
-    cdef double evaluate(self, void* value, long index):
-        cdef double distance = distanceVec3(&self.origin, <Vector3*>value)
-        if distance <= self.minDistance: return 1
-        if distance <= self.maxDistance: return 1 - (distance - self.minDistance) * self.factor
-        return 0
+    cdef float evaluate(self, void *value, Py_ssize_t index):
+        return calcDistance(self, <Vector3*>value)
+
+    cdef void evaluateList(self, void *values, Py_ssize_t startIndex,
+                           Py_ssize_t amount, float *target):
+        cdef Py_ssize_t i
+        for i in range(amount):
+            target[i] = calcDistance(self, <Vector3*>values + i)
+
+
+cdef inline float calcDistance(PointDistanceFalloff self, Vector3 *v):
+    cdef float distance = distanceVec3(&self.origin, v)
+    if distance <= self.minDistance: return 1
+    if distance <= self.maxDistance: return 1 - (distance - self.minDistance) * self.factor
+    return 0

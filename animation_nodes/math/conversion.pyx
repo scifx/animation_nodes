@@ -1,8 +1,24 @@
 from mathutils import Vector, Matrix, Euler
 from mathutils import Quaternion as PyQuaternion
+from .. data_structures.color import Color as PyColor
 
 # Vectors
 ##########################################################
+
+cdef Vector2 toVector2(value) except *:
+    cdef Vector2 v
+    setVector2(&v, value)
+    return v
+
+cdef setVector2(Vector2* v, value):
+    if len(value) != 2:
+        raise TypeError("element is not a 2D vector")
+    v.x = value[0]
+    v.y = value[1]
+
+cdef toPyVector2(Vector2* v):
+    return Vector((v.x, v.y))
+
 
 cdef Vector3 toVector3(value) except *:
     cdef Vector3 v
@@ -122,3 +138,23 @@ cdef setQuaternion(Quaternion* q, value):
 
 cdef toPyQuaternion(Quaternion* q):
     return PyQuaternion((q.w, q.x, q.y, q.z))
+
+
+# Colors
+###########################################################
+
+cdef Color toColor(value) except *:
+    cdef Color c
+    setColor(&c, value)
+    return c
+
+cdef setColor(Color* c, value):
+    if len(value) != 4:
+        raise TypeError("Element is not a color.")
+    c.r = value[0]
+    c.g = value[1]
+    c.b = value[2]
+    c.a = value[3]
+
+cdef toPyColor(Color* c):
+    return PyColor((c.r, c.g, c.b, c.a))

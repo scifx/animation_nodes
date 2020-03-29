@@ -2,28 +2,31 @@ import bpy
 from bpy.props import *
 from mathutils import Matrix
 from ... data_structures import Spline
-from ... base_types import VectorizedNode
+from ... base_types import AnimationNode, VectorizedSocket
 
 transformationTypeItems = [
-    ("Matrix List", "Matrices", "", "NONE", 0),
-    ("Vector List", "Vectors", "", "NONE", 1)
+    ("MATRIX_LIST", "Matrices", "", "NONE", 0),
+    ("VECTOR_LIST", "Vectors", "", "NONE", 1)
 ]
 
-class ReplicateSplineNode(bpy.types.Node, VectorizedNode):
+class ReplicateSplineNode(bpy.types.Node, AnimationNode):
     bl_idname = "an_ReplicateSplineNode"
     bl_label = "Replicate Spline"
 
-    useSplineList = VectorizedNode.newVectorizeProperty()
+    useSplineList: VectorizedSocket.newProperty()
 
-    transformationType = EnumProperty(name = "Transformation Type", default = "Matrix List",
-        items = transformationTypeItems, update = VectorizedNode.refresh)
+    transformationType: EnumProperty(name = "Transformation Type", default = "MATRIX_LIST",
+        items = transformationTypeItems, update = AnimationNode.refresh)
 
     def create(self):
-        self.newVectorizedInput("Spline", "useSplineList",
+        self.newInput(VectorizedSocket("Spline", "useSplineList",
             ("Spline", "spline", dict(defaultDrawType = "PROPERTY_ONLY")),
-            ("Splines", "splines"))
+            ("Splines", "splines")))
 
-        self.newInput(self.transformationType, "Transformations", "transformations")
+        if self.transformationType == "MATRIX_LIST":
+            self.newInput("Matrix List", "Transformations", "transformations")
+        else:
+            self.newInput("Vector List", "Transformations", "transformations")
 
         self.newOutput("Spline List", "Splines", "outSplines")
 
@@ -31,9 +34,9 @@ class ReplicateSplineNode(bpy.types.Node, VectorizedNode):
         layout.prop(self, "transformationType", text = "")
 
     def getExecutionFunctionName(self):
-        if self.transformationType == "Matrix List":
+        if self.transformationType == "MATRIX_LIST":
             return "execute_MatrixList"
-        elif self.transformationType == "Vector List":
+        elif self.transformationType == "VECTOR_LIST":
             return "execute_VectorList"
 
     def execute_MatrixList(self, splines, matrices):

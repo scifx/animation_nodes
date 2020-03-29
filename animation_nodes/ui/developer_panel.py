@@ -4,12 +4,13 @@ from .. operators.output_execution_code import setupTextEditorCallback, executio
 
 
 class DeveloperPanel(bpy.types.Panel):
-    bl_idname = "an_developer_panel"
+    bl_idname = "AN_PT_developer_panel"
     bl_label = "Developer"
     bl_space_type = "NODE_EDITOR"
-    bl_region_type = "TOOLS"
-    bl_category = "Animation Nodes"
+    bl_region_type = "UI"
+    bl_category = "Node Tree"
     bl_options = {"DEFAULT_CLOSED"}
+    bl_order = 3
 
     @classmethod
     def poll(cls, context):
@@ -36,7 +37,7 @@ class DeveloperPanel(bpy.types.Panel):
 
     def drawExecutionCodeSettings(self, layout, preferences):
         executionCode = preferences.executionCode
-        layout.label("Execution Code:")
+        layout.label(text = "Execution Code:")
 
         col = layout.column(align = True)
 

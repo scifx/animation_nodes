@@ -3,13 +3,14 @@ from bpy.props import *
 from mathutils import Vector
 from ... events import propertyChanged
 from ... base_types import AnimationNode
+from ... utils.depsgraph import getEvaluatedID
 from ... data_structures import Vector3DList, EdgeIndicesList, PolygonIndicesList
 
 class ObjectBoundingBoxNode(bpy.types.Node, AnimationNode):
     bl_idname = "an_ObjectBoundingBoxNode"
     bl_label = "Object Bounding Box"
 
-    useWorldSpace = BoolProperty(name = "Use World Space", default = True, update = propertyChanged)
+    useWorldSpace: BoolProperty(name = "Use World Space", default = True, update = propertyChanged)
 
     def create(self):
         self.newInput("Object", "Object", "object", defaultDrawType = "PROPERTY_ONLY")
@@ -25,9 +26,10 @@ class ObjectBoundingBoxNode(bpy.types.Node, AnimationNode):
         if object is None:
             return Vector3DList(), EdgeIndicesList(), PolygonIndicesList(), Vector((0, 0, 0))
 
-        vertices = Vector3DList.fromValues(object.bound_box)
+        evaluatedObject = getEvaluatedID(object)
+        vertices = Vector3DList.fromValues(evaluatedObject.bound_box)
         if self.useWorldSpace:
-            vertices.transform(object.matrix_world)
+            vertices.transform(evaluatedObject.matrix_world)
 
         center = (vertices[0] + vertices[6]) / 2
         return vertices, edges.copy(), polygons.copy(), center

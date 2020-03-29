@@ -10,17 +10,17 @@ frameTypeItems = [
 class CopyTransformsNode(bpy.types.Node, AnimationNode):
     bl_idname = "an_CopyTransformsNode"
     bl_label = "Copy Transforms"
-    bl_width_default = 170
+    bl_width_default = 160
 
     def useCurrentTransformsChanged(self, context):
         self.inputs["Frame"].hide = self.useCurrentTransforms
         executionCodeChanged()
 
-    useCurrentTransforms = BoolProperty(
+    useCurrentTransforms: BoolProperty(
         name = "Use Current Transforms", default = True,
         update = useCurrentTransformsChanged)
 
-    frameType = EnumProperty(
+    frameType: EnumProperty(
         name = "Frame Type", default = "OFFSET",
         items = frameTypeItems, update = executionCodeChanged)
 
@@ -40,12 +40,13 @@ class CopyTransformsNode(bpy.types.Node, AnimationNode):
         col.active = not self.useCurrentTransforms
         col.prop(self, "frameType")
 
-    def getExecutionCode(self):
+    def getExecutionCode(self, required):
         yield "if fromObject and toObject:"
         if self.useCurrentTransforms:
-            yield "    toObject.location = fromObject.location"
-            yield "    toObject.rotation_euler = fromObject.rotation_euler"
-            yield "    toObject.scale = fromObject.scale"
+            yield "    evaluatedFromObject = AN.utils.depsgraph.getEvaluatedID(fromObject)"
+            yield "    toObject.location = evaluatedFromObject.location"
+            yield "    toObject.rotation_euler = evaluatedFromObject.rotation_euler"
+            yield "    toObject.scale = evaluatedFromObject.scale"
         else:
             if self.frameType == "OFFSET": yield "    evaluationFrame = frame + self.nodeTree.scene.frame_current_final"
             else: yield "    evaluationFrame = frame"

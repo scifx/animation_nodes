@@ -1,9 +1,17 @@
 import bpy
 from bpy.props import *
-from ... base_types import AnimationNode, AutoSelectDataType
+from ... base_types import AnimationNode, DataTypeSelectorSocket
 
-compare_types = ["A = B", "A != B", "A < B", "A <= B", "A > B", "A >= B", "A is B","A is None"]
-compare_types_items = [(t, t, "") for t in compare_types]
+compareTypeItems = [
+    ("A=B", "A = B", "", "NONE", 0),
+    ("A!=B", "A != B", "", "NONE", 1),
+    ("A<B", "A < B", "", "NONE", 2),
+    ("A<=B", "A <= B", "", "NONE", 3),
+    ("A>B", "A > B", "", "NONE", 4),
+    ("A>=B", "A >= B", "", "NONE", 5),
+    ("A_IS_B", "A is B", "", "NONE", 6),
+    ("A_IS_NONE", "A is None", "", "NONE", 7),
+]
 
 numericLabelTypes = ["Integer", "Float"]
 
@@ -12,28 +20,24 @@ class CompareNode(bpy.types.Node, AnimationNode):
     bl_label = "Compare"
     dynamicLabelType = "HIDDEN_ONLY"
 
-    assignedType = StringProperty(update = AnimationNode.refresh, default = "Integer")
+    assignedType: DataTypeSelectorSocket.newProperty(default = "Integer")
 
-    compareType = EnumProperty(name = "Compare Type",
-        items = compare_types_items, update = AnimationNode.refresh)
+    compareType: EnumProperty(name = "Compare Type",
+        items = compareTypeItems, update = AnimationNode.refresh)
 
     def create(self):
-        self.newInput(self.assignedType, "A", "a")
-        if self.compareType != "A is None":
-            self.newInput(self.assignedType, "B", "b")
-        self.newOutput("an_BooleanSocket", "Result", "result")
+        self.newInput(DataTypeSelectorSocket("A", "a", "assignedType"))
+        if self.compareType != "A_IS_NONE":
+            self.newInput(DataTypeSelectorSocket("B", "b", "assignedType"))
 
-        self.newSocketEffect(AutoSelectDataType("assignedType",
-            [self.inputs[0],
-             self.inputs[1] if len(self.inputs) == 2 else None]
-        ))
+        self.newOutput("Boolean", "Result", "result")
 
     def draw(self, layout):
         layout.prop(self, "compareType", text = "Type")
 
     def drawLabel(self):
-        label = self.compareType
-        if self.assignedType in numericLabelTypes:
+        label = [item[1] for item in compareTypeItems if self.compareType == item[0]][0]
+        if self.assignedType in numericLabelTypes and len(self.inputs) == 2:
             if getattr(self.socketA, "isUnlinked", False):
                 label = label.replace("A", str(round(self.socketA.value, 4)))
             if getattr(self.socketB, "isUnlinked", False):
@@ -44,21 +48,22 @@ class CompareNode(bpy.types.Node, AnimationNode):
         self.invokeSelector(layout, "DATA_TYPE", "assignType",
             text = "Change Type", icon = "TRIA_RIGHT")
 
-    def getExecutionCode(self):
+    def getExecutionCode(self, required):
         type = self.compareType
-        if type == "A = B":     return "result = a == b"
-        if type == "A != B":    return "result = a != b"
-        if type == "A < B":	    return "try: result = a < b \nexcept: result = False"
-        if type == "A <= B":    return "try: result = a <= b \nexcept: result = False"
-        if type == "A > B":	    return "try: result = a > b \nexcept: result = False"
-        if type == "A >= B":    return "try: result = a >= b \nexcept: result = False"
-        if type == "A is B":    return "result = a is b"
-        if type == "A is None": return "result = a is None"
+        if type == "A=B":     return "result = a == b"
+        if type == "A!=B":    return "result = a != b"
+        if type == "A<B":	    return "try: result = a < b \nexcept: result = False"
+        if type == "A<=B":    return "try: result = a <= b \nexcept: result = False"
+        if type == "A>B":	    return "try: result = a > b \nexcept: result = False"
+        if type == "A>=B":    return "try: result = a >= b \nexcept: result = False"
+        if type == "A_IS_B":    return "result = a is b"
+        if type == "A_IS_NONE": return "result = a is None"
         return "result = False"
 
     def assignType(self, dataType):
-        if self.assignedType == dataType: return
-        self.assignedType = dataType
+        if self.assignedType != dataType:
+            self.assignedType = dataType
+            self.refresh()
 
     @property
     def socketA(self):
