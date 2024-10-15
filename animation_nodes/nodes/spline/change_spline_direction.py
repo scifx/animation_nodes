@@ -2,7 +2,7 @@ import bpy
 from ... data_structures import PolySpline, BezierSpline
 from ... base_types import AnimationNode, VectorizedSocket
 
-class ChangeSplineDirectionNode(bpy.types.Node, AnimationNode):
+class ChangeSplineDirectionNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_ChangeSplineDirectionNode"
     bl_label = "Change Spline Direction"
     codeEffects = [VectorizedSocket.CodeEffect]
@@ -27,11 +27,13 @@ class ChangeSplineDirectionNode(bpy.types.Node, AnimationNode):
             return PolySpline(points = spline.points.reversed(),
                               radii = spline.radii.reversed(),
                               tilts = spline.tilts.reversed(),
-                              cyclic = spline.cyclic)
+                              cyclic = spline.cyclic,
+                              materialIndex = spline.materialIndex)
         elif spline.type == "BEZIER":
             return BezierSpline(points = spline.points.reversed(),
                                 leftHandles = spline.rightHandles.reversed(),
                                 rightHandles = spline.leftHandles.reversed(),
                                 radii = spline.radii.reversed(),
                                 tilts = spline.tilts.reversed(),
-                                cyclic = spline.cyclic)
+                                cyclic = spline.cyclic,
+                                materialIndex = spline.materialIndex)

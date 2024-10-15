@@ -1,11 +1,11 @@
 import bpy
 from bpy.props import *
 from math import pi as _pi
-from libc.math cimport sin, cos
+from libc.math cimport sin, cos, sqrt
 from ... utils.limits cimport INT_MAX
+from ... events import propertyChanged
 from ... base_types import AnimationNode
-from ... events import executionCodeChanged
-from ... data_structures cimport Mesh, Matrix4x4List, Vector3DList
+from ... data_structures cimport Mesh, Matrix4x4List, Vector3DList, Spline, Interpolation
 from ... algorithms.rotations.rotation_and_direction cimport directionToMatrix_LowLevel
 from ... math cimport (Matrix4, Vector3, setTranslationMatrix,
     setMatrixTranslation, setRotationZMatrix, toVector3, scaleMatrix3x3Part)
@@ -16,10 +16,17 @@ modeItems = [
     ("GRID", "Grid", "", "NONE", 1),
     ("CIRCLE", "Circle", "", "NONE", 2),
     ("MESH", "Mesh", "", "NONE", 3),
-    ("SPIRAL", "Spiral", "", "NONE", 4)
+    ("SPIRAL", "Spiral", "", "NONE", 4),
+    ("SPLINE", "Spline", "", "NONE", 5),
+    ("HEXAGONAL_GRID", "Hexagonal Grid", "", "NONE", 6),
 ]
 
 distanceModeItems = [
+    ("STEP", "Step", "Define the distance between two points", "NONE", 0),
+    ("SIZE", "Size", "Define how large the grid will be in total", "NONE", 1)
+]
+
+hexagonalDistanceModeItems = [
     ("STEP", "Step", "Define the distance between two points", "NONE", 0),
     ("SIZE", "Size", "Define how large the grid will be in total", "NONE", 1)
 ]
@@ -29,31 +36,77 @@ meshModeItems = [
     ("POLYGONS", "Polygons", "", "NONE", 1)
 ]
 
+splineDistributionMethodItems = (
+    ("UNIFORM", "Uniform", "", "NONE", 0),
+    ("STEP", "Step", "", "NONE", 1),
+    ("RESOLUTION", "Resolution", "","NONE", 2),
+    ("VERTICES", "Vertices", "", "NONE", 3),
+)
 
-class DistributeMatricesNode(bpy.types.Node, AnimationNode):
+searchItems = {
+    "Distribute Linear" : "LINEAR",
+    "Distribute Grid" : "GRID",
+    "Distribute Circle" : "CIRCLE",
+    "Distribute Mesh" : "MESH",
+    "Distribute Spiral" : "SPIRAL",
+    "Distribute Spline" : "SPLINE",
+    "Distribute Hexagonal Grid" : "HEXAGONAL_GRID",
+}
+
+directionAxisItems = [(axis, axis, "") for axis in ("X", "Y", "Z")]
+
+planeAxisItems = [(axis, axis, "") for axis in ("XY", "YZ", "ZX")]
+
+class DistributeMatricesNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_DistributeMatricesNode"
     bl_label = "Distribute Matrices"
-    bl_width_default = 160
+    searchTags = [(name, {"mode" : repr(op)}) for name, op in searchItems.items()]
 
     __annotations__ = {}
 
     __annotations__["mode"] = EnumProperty(name = "Mode", default = "GRID",
         items = modeItems, update = AnimationNode.refresh)
 
+    __annotations__["directionAxis"] = EnumProperty(items = directionAxisItems, update = propertyChanged, default = "X")
+    __annotations__["centerLinear"] =  BoolProperty(name = "Center Linear",
+        description = "Center the linear along the axis",
+        default = False, update = propertyChanged)
+
     __annotations__["distanceMode"] = EnumProperty(name = "Distance Mode", default = "SIZE",
         items = distanceModeItems, update = AnimationNode.refresh)
+
+    __annotations__["centerAlongX"] = BoolProperty(name = "Center Along X", default = True,
+        description = "Center the grid along the x axis", update = propertyChanged)
+    __annotations__["centerAlongY"] = BoolProperty(name = "Center Along Y", default = True,
+        description = "Center the grid along the y axis", update = propertyChanged)
+    __annotations__["centerAlongZ"] = BoolProperty(name = "Center Along Z", default = False,
+        description = "Center the grid along the z axis", update = propertyChanged)
+
+    __annotations__["planeAxis"] = EnumProperty(items = planeAxisItems, update = propertyChanged, default = "XY")
 
     __annotations__["meshMode"] = EnumProperty(name = "Mesh Mode", default = "VERTICES",
         items = meshModeItems, update = AnimationNode.refresh)
 
-    __annotations__["centerAlongX"] = BoolProperty(name = "Center Along X", default = True,
-        description = "Center the grid along the x axis", update = executionCodeChanged)
-    __annotations__["centerAlongY"] = BoolProperty(name = "Center Along Y", default = True,
-        description = "Center the grid along the y axis", update = executionCodeChanged)
-    __annotations__["centerAlongZ"] = BoolProperty(name = "Center Along Z", default = False,
-        description = "Center the grid along the z axis", update = executionCodeChanged)
+    __annotations__["centerSpiral"] =  BoolProperty(name = "Center Spiral",
+        description = "Center the spiral along Z axis",
+        default = False, update = propertyChanged)
 
-    __annotations__["exactCircleSegment"] = BoolProperty(name = "Exact Circle Segment", default = False)
+    __annotations__["splineDistributionMethod"] = EnumProperty(name = "Distribution Method",
+        default = "UNIFORM", items = splineDistributionMethodItems, update = AnimationNode.refresh)
+
+    __annotations__["exactCircleSegment"] = BoolProperty(name = "Exact Circle Segment", default = False,
+        update = propertyChanged)
+
+    __annotations__["splineResolution"] = IntProperty(name = "Spline Resolution", min = 2, default = 20,
+        description = "Increase to have a more accurate evaluation if the type is set to Uniform",
+        update = propertyChanged)
+
+    __annotations__["hexagonalDistanceMode"] = EnumProperty(name = "Distance Mode", default = "SIZE",
+        items = hexagonalDistanceModeItems, update = AnimationNode.refresh)
+    __annotations__["hexGridCenterX"] = BoolProperty(name = "Center Along X", default = True,
+        description = "Center hexagonal grid along the x axis", update = propertyChanged)
+    __annotations__["hexGridCenterY"] = BoolProperty(name = "Center Along Y", default = True,
+        description = "Center hexagonal grid along the y axis", update = propertyChanged)
 
     def create(self):
         if self.mode == "LINEAR":
@@ -88,6 +141,23 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
             self.newInput("Float", "End Size", "endSize", value = 0.5, minValue = 0)
             self.newInput("Float", "Start Angle", "startAngle", value = 0)
             self.newInput("Float", "End Angle", "endAngel", value = 6 * PI)
+            self.newInput("Float", "Height", "spiralHeight", value = 0)
+            self.newInput("Interpolation", "Radius Interpolation", "radiusInterpolation", defaultDrawType = "PROPERTY_ONLY", hide = True)
+            self.newInput("Interpolation", "Height Interpolation", "heightInterpolation", defaultDrawType = "PROPERTY_ONLY", hide = True)
+        elif self.mode == "SPLINE":
+            self.newInput("Spline", "Spline", "spline", defaultDrawType = "PROPERTY_ONLY")
+            if self.splineDistributionMethod == "STEP":
+                self.newInput("Float", "Step", "step", value = 0.1, minValue = 0)
+            elif self.splineDistributionMethod in ("RESOLUTION", "UNIFORM"):
+                self.newInput("Integer", "Count", "count", value = 50, minValue = 0)
+            if self.splineDistributionMethod != "VERTICES":
+                self.newInput("Float", "Start", "start", value = 0.0).setRange(0.0, 1.0)
+                self.newInput("Float", "End", "end", value = 1.0).setRange(0.0, 1.0)
+        elif self.mode == "HEXAGONAL_GRID":
+            self.newInput("Integer", "X Divisions", "xDivisions", value = 6, minValue = 0)
+            self.newInput("Integer", "Y Divisions", "yDivisions", value = 6, minValue = 0)
+            self.newInput("Float", "X Size", "xSize", value = 5)
+            self.newInput("Float", "Y Size", "ySize", value = 5)
 
         self.newOutput("Matrix List", "Matrices", "matrices")
         self.newOutput("Vector List", "Vectors", "vectors")
@@ -97,17 +167,34 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
         col.prop(self, "mode", text = "")
         if self.mode in ("LINEAR", "GRID"):
             col.prop(self, "distanceMode", text = "")
-        if self.mode == "MESH":
-            col.prop(self, "meshMode", text = "")
+        if self.mode == "LINEAR":
+            layout.prop(self, "directionAxis", expand = True)
+            layout.prop(self, "centerLinear", toggle = True)
         if self.mode == "GRID":
             row = col.row(align = True)
             row.prop(self, "centerAlongX", text = "X", toggle = True)
             row.prop(self, "centerAlongY", text = "Y", toggle = True)
             row.prop(self, "centerAlongZ", text = "Z", toggle = True)
+        if self.mode == "CIRCLE":
+            layout.prop(self, "planeAxis", expand = True)
+        if self.mode == "MESH":
+            col.prop(self, "meshMode", text = "")
+        if self.mode == "SPIRAL":
+            layout.prop(self, "centerSpiral", toggle = True)
+        if self.mode == "SPLINE":
+            col.prop(self, "splineDistributionMethod", text = "")
+        if self.mode == "HEXAGONAL_GRID":
+            col.prop(self, "hexagonalDistanceMode", text = "")
+            row = col.row(align = True)
+            row.prop(self, "hexGridCenterX", text = "X", toggle = True)
+            row.prop(self, "hexGridCenterY", text = "Y", toggle = True)
 
     def drawAdvanced(self, layout):
         if self.mode == "CIRCLE":
             layout.prop(self, "exactCircleSegment")
+        if self.mode == "SPLINE":
+            if self.splineDistributionMethod in ("UNIFORM", "STEP"):
+                layout.prop(self, "splineResolution")
 
     def getExecutionCode(self, required):
         if self.mode == "LINEAR":
@@ -117,9 +204,13 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
                 yield "matrices = self.execute_Linear(amount, size)"
         elif self.mode == "GRID":
             if self.distanceMode == "STEP":
-                yield "matrices = self.execute_Grid(xDivisions, yDivisions, zDivisions, xDistance, yDistance, zDistance)"
+                yield ("matrices = self.execute_Grid(xDivisions, yDivisions, zDivisions,"
+                       " xDistance, yDistance, zDistance,"
+                       " self.centerAlongX, self.centerAlongY, self.centerAlongZ)")
             else:
-                yield "matrices = self.execute_Grid(xDivisions, yDivisions, zDivisions, width, length, height)"
+                yield ("matrices = self.execute_Grid(xDivisions, yDivisions, zDivisions,"
+                       " width, length, height,"
+                       " self.centerAlongX, self.centerAlongY, self.centerAlongZ)")
         elif self.mode == "CIRCLE":
             yield "matrices = self.execute_Circle(amount, radius, segment)"
         elif self.mode == "MESH":
@@ -128,15 +219,31 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
             elif self.meshMode == "POLYGONS":
                 yield "matrices = self.execute_Polygons(mesh)"
         elif self.mode == "SPIRAL":
-            yield "matrices = self.execute_Spiral(amount, startRadius, endRadius, startSize, endSize, startAngle, endAngel)"
+            yield "matrices = self.execute_Spiral(amount, startRadius, endRadius, startSize, endSize, startAngle, endAngel,\
+                                                  spiralHeight, radiusInterpolation, heightInterpolation)"
+        elif self.mode == "SPLINE":
+            if self.splineDistributionMethod == "STEP":
+                yield "matrices = self.execute_SplineStep(spline, step, start, end)"
+            elif self.splineDistributionMethod in ("RESOLUTION", "UNIFORM"):
+                yield "matrices = self.execute_SplineCount(spline, count, start, end)"
+            else:
+                yield "matrices = self.execute_SplineVertices(spline)"
+        elif self.mode == "HEXAGONAL_GRID":
+            yield "matrices = self.execute_HexagonalGrid(xDivisions, yDivisions, xSize, ySize)"
 
         if "vectors" in required:
             yield "vectors = AN.nodes.matrix.c_utils.extractMatrixTranslations(matrices)"
 
     def execute_Linear(self, amount, size):
-        return self.execute_Grid(amount, 1, 1, size, 0, 0)
+        if self.directionAxis == "X":
+            return self.execute_Grid(amount, 1, 1, size, 0, 0, self.centerLinear, False, False)
+        elif self.directionAxis == "Y":
+            return self.execute_Grid(1, amount, 1, 0, size, 0, False, self.centerLinear, False)
+        else:
+            return self.execute_Grid(1, 1, amount, 0, 0, size, False, False, self.centerLinear)
 
-    def execute_Grid(self, xDivisions, yDivisions, zDivisions, size1, size2, size3):
+    def execute_Grid(self, xDivisions, yDivisions, zDivisions, size1, size2, size3,
+                     xCenter, yCenter, zCenter):
         cdef:
             int xDiv = limitAmount(xDivisions)
             int yDiv = limitAmount(yDivisions)
@@ -154,9 +261,9 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
             yDis = size2 / max(yDiv - 1, 1)
             zDis = size3 / max(zDiv - 1, 1)
 
-        xOffset = xDis * (xDiv - 1) / 2 * int(self.centerAlongX)
-        yOffset = yDis * (yDiv - 1) / 2 * int(self.centerAlongY)
-        zOffset = zDis * (zDiv - 1) / 2 * int(self.centerAlongZ)
+        xOffset = xDis * (xDiv - 1) / 2 * int(xCenter)
+        yOffset = yDis * (yDiv - 1) / 2 * int(yCenter)
+        zOffset = zDis * (zDiv - 1) / 2 * int(zCenter)
 
         for x in range(xDiv):
             for y in range(yDiv):
@@ -185,12 +292,39 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
         stepCos = cos(angleStep)
         stepSin = sin(angleStep)
 
+        if self.planeAxis == "XY":
+            for i in range(amount):
+                vector.x = iCos * radius
+                vector.y = iSin * radius
+                vector.z = 0
+
+                setTranslationMatrix(matrices.data + i, &vector)
+                setMatrixCustomZRotation(matrices.data + i, iCos, iSin)
+
+                rotateStep(&iCos, &iSin, stepCos, stepSin)
+
+            return matrices
+
+        if self.planeAxis == "YZ":
+            for i in range(amount):
+                vector.x = 0
+                vector.y = iCos * radius
+                vector.z = iSin * radius
+
+                setTranslationMatrix(matrices.data + i, &vector)
+                setMatrixCustomXRotation(matrices.data + i, iCos, iSin)
+
+                rotateStep(&iCos, &iSin, stepCos, stepSin)
+
+            return matrices
+
         for i in range(amount):
             vector.x = iCos * radius
-            vector.y = iSin * radius
-            vector.z = 0
+            vector.y = 0
+            vector.z = iSin * radius
+
             setTranslationMatrix(matrices.data + i, &vector)
-            setMatrixCustomZRotation(matrices.data + i, iCos, iSin)
+            setMatrixCustomYRotation(matrices.data + i, iCos, iSin)
 
             rotateStep(&iCos, &iSin, stepCos, stepSin)
 
@@ -217,11 +351,13 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
 
         return matrices
 
-    def execute_Spiral(self, Py_ssize_t amount, float startRadius, float endRadius,
-                             float startSize, float endSize, float startAngle, float endAngle):
+    def execute_Spiral(self, Py_ssize_t _amount, float startRadius, float endRadius,
+                             float startSize, float endSize, float startAngle, float endAngle,
+                             float spiralHeight, Interpolation radiusInterpolation, Interpolation heightInterpolation):
         cdef Py_ssize_t i
         cdef Vector3 position
         cdef float iCos, iSin, stepCos, stepSin, f, size
+        cdef int amount = limitAmount(_amount)
         cdef Matrix4x4List matrices = Matrix4x4List(length = amount)
         cdef float factor = 1 / <float>(amount - 1) if amount > 1 else 0
         cdef float angleStep = (endAngle - startAngle) / (amount - 1) if amount > 1 else 0
@@ -231,15 +367,17 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
         stepCos = cos(angleStep)
         stepSin = sin(angleStep)
 
+        zOffset = (spiralHeight / 2) * self.centerSpiral
+
         for i in range(amount):
             f = <float>i * factor
 
             size = f * (endSize - startSize) + startSize
-            radius = f * (endRadius - startRadius) + startRadius
+            radius = (endRadius - startRadius) * radiusInterpolation.evaluate(f) + startRadius
 
             position.x = iCos * radius
             position.y = iSin * radius
-            position.z = 0
+            position.z = spiralHeight * heightInterpolation.evaluate(f) - zOffset
 
             setTranslationMatrix(matrices.data + i, &position)
             setMatrixCustomZRotation(matrices.data + i, iCos, iSin)
@@ -249,8 +387,71 @@ class DistributeMatricesNode(bpy.types.Node, AnimationNode):
 
         return matrices
 
+    def execute_SplineStep(self, Spline spline, float step, float start, float end):
+        if not spline.isEvaluable(): return Matrix4x4List()
+        spline.ensureUniformConverter(self.splineResolution)
+        cdef float uniformStart = spline.toUniformParameter(min(max(start, 0), 1))
+        cdef float uniformEnd = spline.toUniformParameter(min(max(end, 0), 1))
+        cdef float length = spline.getPartialLength(uniformStart, uniformEnd, self.splineResolution)
+        cdef Py_ssize_t count = <Py_ssize_t>(length / step) if step > 0 else 0
+        return self.execute_SplineCount(spline, count, start, end)
+
+    def execute_SplineCount(self, Spline spline, Py_ssize_t count, float start, float end):
+        if not spline.isEvaluable(): return Matrix4x4List()
+        if self.splineDistributionMethod == "UNIFORM":
+            spline.ensureUniformConverter(self.splineResolution)
+        start = min(max(start, 0), 1)
+        end = min(max(end, 0), 1)
+        spline.ensureNormals()
+        count = max(count, 0)
+        distributionType = "UNIFORM" if self.splineDistributionMethod != "RESOLUTION" else "RESOLUTION"
+        return spline.getDistributedMatrices(count, start, end, distributionType)
+
+    def execute_SplineVertices(self, Spline spline):
+        if not spline.isEvaluable(): return Matrix4x4List()
+        spline.ensureNormals()
+        count = len(spline.points)
+        return spline.getDistributedMatrices(count, 0, 1, "RESOLUTION")
+
+    def execute_HexagonalGrid(self, int xDivisions, int yDivisions, float xSize, float ySize):
+        cdef float xDistance = xSize * 1.5
+        cdef float yDistance = ySize * sqrt(3)
+
+        if self.hexagonalDistanceMode == "SIZE":
+            xDistance /= max(xDivisions - 1, 1)
+            yDistance /= max(yDivisions - 1, 1)
+
+        cdef float xOffset = 0
+        cdef float yOffset = 0
+
+        if self.hexGridCenterX:
+            xOffset = xDistance * (xDivisions - 1) / 2
+        if self.hexGridCenterY:
+            yOffset = yDistance * (yDivisions - 1) / 2
+
+        cdef Vector3 translation = toVector3((0, 0, 0))
+        cdef Matrix4x4List matrices = Matrix4x4List(length = xDivisions * yDivisions)
+        cdef Py_ssize_t i, j, index
+
+        for j in range(yDivisions):
+            for i in range(xDivisions):
+                index = j * xDivisions + i
+                translation.x = i * xDistance - xOffset
+                translation.y = (j + 0.5 * (i % 2)) * yDistance - yOffset
+                setTranslationMatrix(matrices.data + index, &translation)
+
+        return matrices
+
 cdef int limitAmount(n):
     return max(min(n, INT_MAX), 0)
+
+cdef inline void setMatrixCustomXRotation(Matrix4* m, double iCos, double iSin):
+    m.a22 = m.a33 = iCos
+    m.a23, m.a32 = -iSin, iSin
+
+cdef inline void setMatrixCustomYRotation(Matrix4* m, double iCos, double iSin):
+    m.a11 = m.a33 = iCos
+    m.a13, m.a31 = -iSin, iSin
 
 cdef inline void setMatrixCustomZRotation(Matrix4* m, double iCos, double iSin):
     m.a11 = m.a22 = iCos

@@ -32,16 +32,17 @@ class SplineSocket(bpy.types.NodeSocket, AnimationNodeSocket):
             row.prop(self, "useWorldSpace", text = "", icon = "WORLD")
 
     def getValue(self):
-        if getattr(self.object, "type", "") != "CURVE":
+        if self.object is None: return BezierSpline()
+        if self.object.type not in ("CURVE", "FONT"):
             return BezierSpline()
 
-        bSplines = self.object.data.splines
+        evaluatedObject = getEvaluatedID(self.object)
+        bSplines = evaluatedObject.an.getCurve().splines
         if len(bSplines) > 0:
             spline = createSplineFromBlenderSpline(bSplines[0])
             # Is None when the spline type is not supported.
             if spline is not None:
                 if self.useWorldSpace:
-                    evaluatedObject = getEvaluatedID(self.object)
                     spline.transform(evaluatedObject.matrix_world)
                 return spline
 
@@ -61,7 +62,7 @@ class SplineSocket(bpy.types.NodeSocket, AnimationNodeSocket):
                 icon = "OUTLINER_OB_CURVE")
         else:
             object = bpy.context.active_object
-            if getattr(object, "type", "") == "CURVE":
+            if getattr(object, "type", "") in ("CURVE", "FONT"):
                 self.object = object
 
     @classmethod
@@ -105,9 +106,9 @@ class SplineListSocket(bpy.types.NodeSocket, PythonListSocket):
 
     def getValue(self):
         if self.object is None: return []
-        splines = createSplinesFromBlenderObject(self.object)
+        evaluatedObject = getEvaluatedID(self.object)
+        splines = createSplinesFromBlenderObject(evaluatedObject)
         if self.useWorldSpace:
-            evaluatedObject = getEvaluatedID(self.object)
             for spline in splines:
                 spline.transform(evaluatedObject.matrix_world)
         return splines

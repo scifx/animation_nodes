@@ -1,7 +1,7 @@
 import bpy
 from ... base_types import AnimationNode, VectorizedSocket
 
-class ShadeObjectSmooth(bpy.types.Node, AnimationNode):
+class ShadeObjectSmooth(AnimationNode, bpy.types.Node):
     bl_idname = "an_ShadeObjectSmoothNode"
     bl_label = "Shade Object Smooth"
     codeEffects = [VectorizedSocket.CodeEffect]
@@ -17,12 +17,16 @@ class ShadeObjectSmooth(bpy.types.Node, AnimationNode):
 
         self.newInput(VectorizedSocket("Boolean", "useSmoothList",
             ("Smooth", "smooth"), ("Smooth", "smooth")))
+        socket = self.inputs[1]
+        socket.useIsUsedProperty = True
+        socket.isUsed = True
 
         self.newOutput(VectorizedSocket("Object", "useObjectList",
             ("Object", "object"), ("Objects", "objects")))
 
     def getExecutionCode(self, required):
-        return "object = self.execute_Single(object, smooth)"
+        if self.inputs[1].isUsed:
+            return "object = self.execute_Single(object, smooth)"
 
     def execute_Single(self, object, smooth):
         if getattr(object, "type", "") == "MESH":
@@ -33,4 +37,7 @@ class ShadeObjectSmooth(bpy.types.Node, AnimationNode):
 
                 # trigger update
                 mesh.polygons[0].use_smooth = smooth
+        elif getattr(object, "type", "") == "CURVE":
+            for spline in object.data.splines:
+                spline.use_smooth = smooth
         return object

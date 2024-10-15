@@ -8,7 +8,7 @@ splineTypeItems = [
     ("POLY", "Poly", "Linear interpolation between the spline points", "NOCURVE", 1)
 ]
 
-class SplineInfoNode(bpy.types.Node, AnimationNode):
+class SplineInfoNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_SplineInfoNode"
     bl_label = "Spline Info"
 
@@ -24,6 +24,7 @@ class SplineInfoNode(bpy.types.Node, AnimationNode):
         self.newOutput("Float List", "Radii", "radii")
         self.newOutput("Float List", "Tilts", "tilts")
         self.newOutput("Boolean", "Cyclic", "cyclic")
+        self.newOutput("Integer", "Material Index", "materialIndex")
         self.newOutput("Integer", "Point Amount", "pointAmount")
 
     def draw(self, layout):
@@ -38,6 +39,8 @@ class SplineInfoNode(bpy.types.Node, AnimationNode):
             yield "tilts = DoubleList.fromValues(spline.tilts)"
         if "cyclic" in required:
             yield "cyclic = spline.cyclic"
+        if "materialIndex" in required:
+            yield "materialIndex = spline.materialIndex"
         if "pointAmount" in required:
             yield "pointAmount = len(spline.points)"
 

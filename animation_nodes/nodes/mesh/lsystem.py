@@ -5,7 +5,7 @@ from ... utils.enum_items import cacheEnumItems
 from ... data_structures import Mesh, DoubleList
 from ... algorithms.lsystem import calculateLSystem
 
-class LSystemNode(bpy.types.Node, AnimationNode):
+class LSystemNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_LSystemNode"
     bl_label = "LSystem"
     errorHandlingType = "EXCEPTION"
@@ -111,7 +111,7 @@ presets = {
     "Tree" : LSystemPreset(
         axiom = "FFFA",
         rules = ["A = \"! [&FFFA] //// [&FFFA] //// [&FFFA]"],
-        angle = 3,
+        angle = 30,
         generations = 4
     ),
     "Cracy Cubes" : LSystemPreset(

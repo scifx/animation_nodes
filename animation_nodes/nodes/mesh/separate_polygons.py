@@ -2,13 +2,13 @@ import bpy
 from . c_utils import separatePolygons
 from ... base_types import AnimationNode
 
-class SeparatePolygonsNode(bpy.types.Node, AnimationNode):
+class SeparatePolygonsNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_SeparatePolygonsNode"
     bl_label = "Separate Polygons"
     errorHandlingType = "EXCEPTION"
 
     def create(self):
-        self.newInput("Vector List", "Vertices", "inVertices")
+        self.newInput("Vector List", "Vertex Locations", "inVertices")
         self.newInput("Polygon Indices List", "Polygon Indices", "inPolygonIndices")
 
         self.newOutput("Vector List", "Vertices", "outVertices")

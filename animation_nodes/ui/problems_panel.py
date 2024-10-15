@@ -4,13 +4,15 @@ from .. import problems
 from .. utils.layout import writeText
 from .. draw_handler import drawHandler
 from .. graphics.rectangle import Rectangle
-from .. utils.blender_ui import getDpiFactor
+from .. utils.blender_ui import getLineWidth
 
 class ProblemsPanel(bpy.types.Panel):
     bl_idname = "AN_PT_problems_panel"
     bl_label = "Problems"
     bl_space_type = "NODE_EDITOR"
-    bl_region_type = "TOOLS"
+    bl_region_type = "UI"
+    bl_category = "Node Tree"
+    bl_order = 4
 
     @classmethod
     def poll(cls, context):
@@ -59,5 +61,5 @@ def drawWarningOverlay():
         rectangle.draw(
             color = (0, 0, 0, 0),
             borderColor = (0.9, 0.1, 0.1, 0.6),
-            borderThickness = 4 * getDpiFactor()
+            borderThickness = 4 * getLineWidth()
         )

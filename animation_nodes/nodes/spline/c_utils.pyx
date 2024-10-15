@@ -1,10 +1,13 @@
+import cython
+from libc.math cimport cos
+from libc.math cimport M_PI as PI
 from ... data_structures.meshes.mesh_data import calculateCrossProducts
 from .. mesh.c_utils import matricesFromNormalizedAxisData
 from ... data_structures cimport (
     Vector3DList, EdgeIndicesList, FloatList,
     Spline, Matrix4x4List, VirtualFloatList
 )
-from ... math cimport scaleMatrix3x3Part
+from ... math cimport scaleMatrix3x3Part, Vector3, subVec3, angleVec3
 
 def getMatricesAlongSpline(Spline spline, Py_ssize_t amount, distribution):
     assert spline.isEvaluable()
@@ -38,3 +41,12 @@ def tiltSplinePoints(Spline spline, VirtualFloatList tilts, bint accumulate):
             splineTilts.data[i] += tilts.get(i)
 
     spline.markChanged()
+
+def wrapSplineParameters(FloatList parameters):
+    cdef FloatList result = FloatList(length = len(parameters))
+    cdef Py_ssize_t i
+    for i in range(len(parameters)):
+        result.data[i] = parameters.data[i] % 1.0
+        if parameters.data[i] != 0 and result.data[i] == 0:
+            result.data[i] = 1.0
+    return result

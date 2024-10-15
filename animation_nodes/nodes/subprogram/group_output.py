@@ -7,7 +7,7 @@ from ... utils.names import getRandomString
 from . subprogram_sockets import subprogramInterfaceChanged
 from ... utils.nodes import newNodeAtCursor, invokeTranslation
 
-class GroupOutputNode(bpy.types.Node, AnimationNode):
+class GroupOutputNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_GroupOutputNode"
     bl_label = "Group Output"
     bl_width_default = 180
@@ -35,6 +35,15 @@ class GroupOutputNode(bpy.types.Node, AnimationNode):
         if inputNode: layout.label(text = inputNode.subprogramName, icon = "GROUP_VERTEX")
         else: self.invokeFunction(layout, "createGroupInputNode", text = "Input Node", icon = "PLUS")
         layout.separator()
+
+
+    def drawAdvanced(self, layout):
+        layout.label(text = "Output Defaults:")
+        box = layout.box()
+        for socket in list(self.inputs)[:-1]:
+            subBox = box.box()
+            subBox.label(text = repr(socket.text))
+            subBox.prop(socket.subprogram, "hideByDefault", text = "Hide")
 
     def drawControlSocket(self, layout, socket):
         left, right = splitAlignment(layout)

@@ -14,7 +14,7 @@ radiusTypeItems = [
     ("VERTEX", "Radius per Vertex", "", "NONE", 1)
 ]
 
-class SplinesFromEdgesNode(bpy.types.Node, AnimationNode):
+class SplinesFromEdgesNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_SplinesFromEdgesNode"
     bl_label = "Splines from Edges"
     errorHandlingType = "EXCEPTION"
@@ -31,7 +31,7 @@ class SplinesFromEdgesNode(bpy.types.Node, AnimationNode):
     useRadiusList: VectorizedSocket.newProperty()
 
     def create(self):
-        self.newInput("Vector List", "Vertices", "vertices", dataIsModified = True)
+        self.newInput("Vector List", "Vertex Locations", "vertices", dataIsModified = True)
         self.newInput("Edge Indices List", "Edge Indices", "edgeIndices")
 
         self.newInput(VectorizedSocket("Float", "useRadiusList",

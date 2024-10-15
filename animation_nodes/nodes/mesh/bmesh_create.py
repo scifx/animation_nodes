@@ -3,7 +3,7 @@ import bmesh
 from bpy.props import *
 from ... base_types import AnimationNode
 
-class CreateBMeshFromMesh(bpy.types.Node, AnimationNode):
+class CreateBMeshFromMesh(AnimationNode, bpy.types.Node):
     bl_idname = "an_CreateBMeshFromMeshNode"
     bl_label = "Create BMesh"
     errorHandlingType = "EXCEPTION"
@@ -32,8 +32,16 @@ def getBMeshFromMesh(meshData):
 
     for edgeIndices in meshData.edges:
         bm.edges.new((bm.verts[edgeIndices[0]], bm.verts[edgeIndices[1]]))
-    for polygonIndices in meshData.polygons:
-        bm.faces.new(tuple(bm.verts[index] for index in polygonIndices))
+
+    materialIndices = meshData.getBuiltInAttribute("Material Indices")
+    if materialIndices is not None:
+        materialIndicesData = materialIndices.data
+        for polygonIndices, materialIndex in zip(meshData.polygons, materialIndicesData):
+            face = bm.faces.new(tuple(bm.verts[index] for index in polygonIndices))
+            face.material_index = materialIndex
+    else:
+        for polygonIndices in meshData.polygons:
+            face = bm.faces.new(tuple(bm.verts[index] for index in polygonIndices))
 
     bm.normal_update()
     return bm

@@ -2,7 +2,7 @@ import bpy
 from ... base_types import AnimationNode, VectorizedSocket
 from ... data_structures import VirtualDoubleList, VirtualPyList, GPLayer
 
-class OffsetGPLayerFramesNode(bpy.types.Node, AnimationNode):
+class OffsetGPLayerFramesNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_OffsetGPLayerFramesNode"
     bl_label = "Offset GP Layer Frames"
 
@@ -12,7 +12,7 @@ class OffsetGPLayerFramesNode(bpy.types.Node, AnimationNode):
     def create(self):
         self.newInput(VectorizedSocket("GPLayer", "useLayerList",
             ("Layer", "layer"), ("Layers", "layers")), dataIsModified = True)
-        self.newInput(VectorizedSocket("Float", "useFrameNumberList",
+        self.newInput(VectorizedSocket("Integer", "useFrameNumberList",
             ("Offset", "offset"), (" Offsets", "offsets")), value = 0)
         self.newOutput(VectorizedSocket("GPLayer", ["useLayerList", "useFrameNumberList"],
             ("Layer", "layer"), ("Layers", "outLayers")))

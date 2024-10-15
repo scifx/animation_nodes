@@ -6,7 +6,7 @@ from ... tree_info import getNodeByIdentifier
 from ... base_types import AnimationNode, VectorizedSocket
 from . subprogram_sockets import subprogramInterfaceChanged
 
-class LoopGeneratorOutputNode(bpy.types.Node, AnimationNode):
+class LoopGeneratorOutputNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_LoopGeneratorOutputNode"
     bl_label = "Loop Generator Output"
     dynamicLabelType = "ALWAYS"
@@ -16,6 +16,8 @@ class LoopGeneratorOutputNode(bpy.types.Node, AnimationNode):
         self.refresh()
         subprogramInterfaceChanged()
 
+    hideByDefault: BoolProperty(name = "Hide By Default", default = False,
+        description = "Hide the socket by default")
     outputName: StringProperty(name = "Generator Name", update = settingChanged)
     loopInputIdentifier: StringProperty(update = settingChanged)
     sortIndex: IntProperty(default = 0)
@@ -47,6 +49,7 @@ class LoopGeneratorOutputNode(bpy.types.Node, AnimationNode):
 
     def drawAdvanced(self, layout):
         layout.prop(self, "outputName", text = "Name")
+        layout.prop(self, "hideByDefault")
         self.invokeSelector(layout, "DATA_TYPE", "setListDataType",
             dataTypes = "LIST", text = "Change Type", icon = "TRIA_RIGHT")
 

@@ -14,7 +14,7 @@ amountTypeItems = [
     ("LENGTH_FLOOR", "Below Length", "Repeat up to Length, needs fill till length", "NONE", 2),
     ("LENGTH_CEIL", "Above Length", "Repeat over Length, needs slice down to length", "NONE", 3)]
 
-class RepeatListNode(bpy.types.Node, AnimationNode):
+class RepeatListNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_RepeatListNode"
     bl_label = "Repeat List"
 
@@ -75,7 +75,7 @@ class RepeatListNode(bpy.types.Node, AnimationNode):
             yield "    _reversedList = AN.algorithms.lists.reverse('%s', inList)" % self.assignedType
             yield "    _sourceList = inList + _reversedList"
 
-        yield "    outList = AN.algorithms.lists.repeat('%s', _sourceList, outLength)" % self.assignedType
+        yield "    outList = AN.algorithms.lists.repeat('%s', _sourceList, outLength, self.makeElementCopies)" % self.assignedType
 
     def getUsedModules(self):
         return ["math"]

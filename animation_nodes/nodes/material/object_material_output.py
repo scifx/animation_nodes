@@ -2,7 +2,7 @@ import bpy
 from bpy.props import *
 from ... base_types import AnimationNode, VectorizedSocket
 
-class ObjectMaterialOutputNode(bpy.types.Node, AnimationNode):
+class ObjectMaterialOutputNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_ObjectMaterialOutputNode"
     bl_label = "Object Material Output"
 
@@ -35,6 +35,7 @@ class ObjectMaterialOutputNode(bpy.types.Node, AnimationNode):
         objectMaterials = object.data.materials
         if not self.appendMaterials: objectMaterials.clear()
 
+        if material is None: return object
         self.appendMaterial(objectMaterials, material)
         return object
 
@@ -45,6 +46,7 @@ class ObjectMaterialOutputNode(bpy.types.Node, AnimationNode):
         if not self.appendMaterials: objectMaterials.clear()
 
         for material in materials:
+            if material is None: continue
             self.appendMaterial(objectMaterials, material)
         return object
 

@@ -9,7 +9,7 @@ targetTypeItems = [
     ("POLY", "Poly", "Linear interpolation between the spline points", "NOCURVE", 1)
 ]
 
-class ChangeSplineTypeNode(bpy.types.Node, AnimationNode):
+class ChangeSplineTypeNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_ChangeSplineTypeNode"
     bl_label = "Change Spline Type"
     codeEffects = [VectorizedSocket.CodeEffect]
@@ -41,7 +41,8 @@ class ChangeSplineTypeNode(bpy.types.Node, AnimationNode):
                 return PolySpline(points = spline.points.copy(),
                                   radii = spline.radii.copy(),
                                   tilts = spline.tilts.copy(),
-                                  cyclic = spline.cyclic)
+                                  cyclic = spline.cyclic,
+                                  materialIndex = spline.materialIndex)
         elif self.targetType == "BEZIER":
             if spline.type == "BEZIER":
                 return spline.copy()
@@ -49,4 +50,5 @@ class ChangeSplineTypeNode(bpy.types.Node, AnimationNode):
                 return BezierSpline(points = spline.points.copy(),
                                     radii = spline.radii.copy(),
                                     tilts = spline.tilts.copy(),
-                                    cyclic = spline.cyclic)
+                                    cyclic = spline.cyclic,
+                                    materialIndex = spline.materialIndex)

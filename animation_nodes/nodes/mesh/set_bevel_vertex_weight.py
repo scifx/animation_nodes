@@ -2,7 +2,7 @@ import bpy
 from ... data_structures import VirtualDoubleList
 from ... base_types import AnimationNode, VectorizedSocket
 
-class SetBevelVertexWeightNode(bpy.types.Node, AnimationNode):
+class SetBevelVertexWeightNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_SetBevelVertexWeightNode"
     bl_label = "Set Bevel Vertex Weight"
     errorHandlingType = "EXCEPTION"
@@ -25,10 +25,9 @@ class SetBevelVertexWeightNode(bpy.types.Node, AnimationNode):
         if object.mode != "OBJECT":
             self.raiseErrorMessage("Object is not in object mode.")
 
-        if not object.data.use_customdata_vertex_bevel:
-            object.data.use_customdata_vertex_bevel = True
-
+        attribute = object.data.attributes.get("bevel_weight_vert")
+        if not attribute: attribute = object.data.attributes.new("bevel_weight_vert", "FLOAT", "POINT")
         weights = VirtualDoubleList.create(weights, 0).materialize(len(object.data.vertices))
-        object.data.vertices.foreach_set('bevel_weight', weights)
+        attribute.data.foreach_set('value', weights)
         object.data.update()
         return object

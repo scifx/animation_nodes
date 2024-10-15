@@ -2,7 +2,7 @@ import bpy
 from ... data_structures import VirtualDoubleList
 from ... base_types import AnimationNode, VectorizedSocket
 
-class SetBevelEdgeWeightNode(bpy.types.Node, AnimationNode):
+class SetBevelEdgeWeightNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_SetBevelEdgeWeightNode"
     bl_label = "Set Bevel Edge Weight"
     errorHandlingType = "EXCEPTION"
@@ -25,10 +25,9 @@ class SetBevelEdgeWeightNode(bpy.types.Node, AnimationNode):
         if object.mode != "OBJECT":
             self.raiseErrorMessage("Object is not in object mode.")
 
-        if not object.data.use_customdata_edge_bevel:
-            object.data.use_customdata_edge_bevel = True
-
+        attribute = object.data.attributes.get("bevel_weight_edge")
+        if not attribute: attribute = object.data.attributes.new("bevel_weight_edge", "FLOAT", "EDGE")
         weights = VirtualDoubleList.create(weights, 0).materialize(len(object.data.edges))
-        object.data.edges.foreach_set('bevel_weight', weights)
+        attribute.data.foreach_set('value', weights)
         object.data.update()
         return object

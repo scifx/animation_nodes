@@ -4,7 +4,7 @@ from ... base_types import AnimationNode
 from ... sockets.info import isBase, toListDataType
 from ... events import executionCodeChanged, propertyChanged
 
-class GetStructListElementsNode(bpy.types.Node, AnimationNode):
+class GetStructListElementsNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_GetStructListElementsNode"
     bl_label = "Get Struct List Elements"
     bl_width_default = 160
@@ -38,7 +38,7 @@ class GetStructListElementsNode(bpy.types.Node, AnimationNode):
     def execute(self, structList):
         key = (self.elementDataType, self.elementKey)
         try:
-            return [struct[key] for struct in structList]
+            return self.outputs[0].correctValue([struct[key] for struct in structList])[0]
         except:
             self.setErrorMessage("The key does not exist in all structs")
-            return []
+            return self.outputs[0].getDefaultValue()

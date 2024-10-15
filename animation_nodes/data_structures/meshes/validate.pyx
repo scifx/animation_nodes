@@ -1,12 +1,14 @@
+cimport cython
 from libc.stdint cimport uint32_t
 
 from .. lists.polygon_indices_list cimport PolygonIndicesList
 from .. lists.base_lists cimport (
     UIntegerList, EdgeIndices, IntegerList,
-    Vector3DList, EdgeIndicesList
+    Vector3DList, EdgeIndicesList, LongList,
 )
 
-def checkMeshData(Vector3DList vertices, EdgeIndicesList edges, PolygonIndicesList polygons):
+def checkMeshData(Vector3DList vertices, EdgeIndicesList edges,
+                  PolygonIndicesList polygons):
     # TODO: maybe check vertices for NaN and inf
     if edges.length > 0 and edges.getMaxIndex() >= vertices.length:
         raise Exception("There is an edge that references a not existing vertex")
@@ -23,6 +25,7 @@ def checkMeshData(Vector3DList vertices, EdgeIndicesList edges, PolygonIndicesLi
     cdef IntegerList polygonsLookup = getLookupForPolygonHashes(polygonHashes, polygons)
 
     checkIfAllRequiredEdgesExist(polygons, edges, edgeHashes, edgesLookup)
+
 
 def validMeshDataFromSourceData(Vector3DList sourceVertices,
                                 EdgeIndicesList sourceEdges, PolygonIndicesList sourcePolygons):
@@ -176,7 +179,6 @@ def getAllPolygonEdges(PolygonIndicesList polygons):
 
     return edges
 
-
 # Compute edge/polygon hashes
 ####################################################
 
@@ -277,6 +279,7 @@ cdef inline Py_ssize_t getEdgeIndex(unsigned int i1, unsigned int i2,
         slot = (slot + 1) & mask
 
 
+@cython.cpow(True)
 cdef createLookupForHashes(UIntegerList hashes,
                          HandleDuplicateFunction handleDuplicate, void *settings):
     cdef Py_ssize_t maskSize = max(hashes.length-1, 0).bit_length() + 1

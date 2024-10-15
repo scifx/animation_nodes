@@ -2,9 +2,10 @@ import bpy
 from bpy.props import *
 from . utils.depsgraph import getEvaluatedID
 from . operators.callbacks import executeCallback
+from . utils.depsgraph import getActiveDepsgraph
 from . data_structures import (Vector3DList, EdgeIndicesList, PolygonIndicesList,
                                FloatList, UShortList, UIntegerList, Vector2DList,
-                               ColorList)
+                               ColorList, DoubleList, LongList, BooleanList, Int2List)
 
 def register():
     bpy.types.Context.getActiveAnimationNodeTree = getActiveAnimationNodeTree
@@ -72,7 +73,7 @@ class MeshProperties(bpy.types.PropertyGroup):
         return areas
 
     def getPolygonMaterialIndices(self):
-        indices = UShortList(length = len(self.mesh.polygons))
+        indices = UIntegerList(length = len(self.mesh.polygons))
         self.mesh.polygons.foreach_get("material_index", indices.asMemoryView())
         return indices
 
@@ -86,12 +87,72 @@ class MeshProperties(bpy.types.PropertyGroup):
         uvMap = Vector2DList(length = len(self.mesh.loops))
         uvLayer.data.foreach_get("uv", uvMap.asMemoryView())
         return uvMap
-    
+
     def getVertexColorLayer(self, name):
         vertexColorLayer = self.mesh.vertex_colors[name]
         vertexColors = ColorList(length = len(vertexColorLayer.data))
         vertexColorLayer.data.foreach_get("color", vertexColors.asNumpyArray())
         return vertexColors
+
+    def getEdgeCreases(self):
+        attribute = self.mesh.attributes.get("crease_edge")
+        if not attribute or len(attribute.data) != len(self.mesh.edges):
+            return DoubleList.fromValue(0, length = len(self.mesh.edges))
+        edgeCreases = DoubleList(length = len(self.mesh.edges))
+        attribute.data.foreach_get("value", edgeCreases.asNumpyArray())
+        return edgeCreases
+
+    def getBevelEdgeWeights(self):
+        attribute = self.mesh.attributes.get("bevel_weight_edge")
+        if not attribute or len(attribute.data) != len(self.mesh.edges):
+            return DoubleList.fromValue(0, length = len(self.mesh.edges))
+        bevelEdgeWeights = DoubleList(length = len(self.mesh.edges))
+        attribute.data.foreach_get("value", bevelEdgeWeights.asNumpyArray())
+        return bevelEdgeWeights
+
+    def getBevelVertexWeights(self):
+        attribute = self.mesh.attributes.get("bevel_weight_vert")
+        if not attribute or len(attribute.data) != len(self.mesh.vertices):
+            return DoubleList.fromValue(0, length = len(self.mesh.vertices))
+        bevelVertexWeights = DoubleList(length = len(self.mesh.vertices))
+        attribute.data.foreach_get("value", bevelVertexWeights.asNumpyArray())
+        return bevelVertexWeights
+
+    def getCustomAttribute(self, name):
+        attribute = self.mesh.attributes.get(name)
+
+        if attribute.domain == "POINT":
+            amount = len(self.mesh.vertices)
+        elif attribute.domain == "EDGE":
+            amount = len(self.mesh.edges)
+        elif attribute.domain == "FACE":
+            amount = len(self.mesh.polygons)
+        else:
+            amount = len(self.mesh.loops)
+
+        if attribute.data_type == "FLOAT":
+            data = DoubleList(length = amount)
+        elif attribute.data_type == "INT":
+            data = LongList(length = amount)
+        elif attribute.data_type == "INT32_2D":
+            data = Int2List(length = amount)
+        elif attribute.data_type == "FLOAT2":
+            data = Vector2DList(length = amount)
+        elif attribute.data_type == "FLOAT_VECTOR":
+            data = Vector3DList(length = amount)
+        elif attribute.data_type in ("FLOAT_COLOR", "BYTE_COLOR"):
+            data = ColorList(length = amount)
+        else:
+            data = BooleanList(length = amount)
+
+        if attribute.data_type in ("FLOAT", "INT", "INT32_2D", "BOOLEAN"):
+            attribute.data.foreach_get("value", data.asNumpyArray())
+        elif attribute.data_type in ("FLOAT2", "FLOAT_VECTOR"):
+            attribute.data.foreach_get("vector", data.asNumpyArray())
+        else:
+            attribute.data.foreach_get("color", data.asNumpyArray())
+
+        return data
 
     @property
     def mesh(self):
@@ -111,9 +172,19 @@ class ObjectProperties(bpy.types.PropertyGroup):
                 else: return object.to_mesh()
             except: return None
 
+    def getCurve(self, applyModifiers = False):
+        bObject = self.id_data
+
+        if bObject is None: return None
+        if bObject.type not in ("CURVE", "FONT"): return None
+
+        if not applyModifiers and bObject.type == "CURVE":
+            return bObject.data
+
+        return bObject.to_curve(getActiveDepsgraph(), apply_modifiers = applyModifiers)
+
 class IDProperties(bpy.types.PropertyGroup):
     bl_idname = "an_IDProperties"
 
     removeOnZeroUsers: BoolProperty(default = False,
         description = "Data block should be removed when it has no users")
-

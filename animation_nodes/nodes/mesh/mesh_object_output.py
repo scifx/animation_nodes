@@ -1,10 +1,11 @@
 import bpy
 import bmesh
+import numpy
 from bpy.props import *
 from ... utils.layout import writeText
 from ... base_types import AnimationNode
 from ... utils.animation import isAnimated
-from ... data_structures import UShortList
+from ... data_structures import UShortList, AttributeType
 from ... events import propertyChanged, executionCodeChanged
 
 meshDataTypeItems = [
@@ -12,7 +13,7 @@ meshDataTypeItems = [
     ("BMESH", "BMesh", "BMesh object", "", 1),
     ("VERTICES", "Vertices", "A list of vertex locations; The length of this list has to be equal to the amount of vertices the mesh already has", "", 2) ]
 
-class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
+class MeshObjectOutputNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_MeshObjectOutputNode"
     bl_label = "Mesh Object Output"
     bl_width_default = 180
@@ -32,6 +33,10 @@ class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
                        "it will be exported as animation by exporters (mainly Alembic)"),
         update = propertyChanged)
 
+    calculateLooseEdges: BoolProperty(name = "Calculate Loose Edges", default = False,
+        description = "Make sure Blender will draw edges that are not part of a polygon",
+        update = propertyChanged)
+
     def create(self):
         socket = self.newInput("Object", "Object", "object")
         socket.defaultDrawType = "PROPERTY_ONLY"
@@ -43,8 +48,6 @@ class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
             self.newInput("BMesh", "BMesh", "bm")
         elif self.meshDataType == "VERTICES":
             self.newInput("Vector List", "Vertices", "vertices")
-
-        self.newInput("Integer List", "Material Indices", "materialIndices")
 
         for socket in self.inputs[1:]:
             socket.useIsUsedProperty = True
@@ -71,23 +74,33 @@ class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
         subcol.active = self.validateMesh
         subcol.prop(self, "validateMeshVerbose", text = "Print Validation Info")
 
+        layout.prop(self, "calculateLooseEdges")
+
     def getExecutionCode(self, required):
+        if not self.isInputUsed(): return
+
         yield "if self.isValidObject(object):"
         yield "    mesh = object.data"
 
-        s = self.inputs
-
         if self.meshDataType == "MESH_DATA":
-            if s["Mesh"].isUsed:    yield "    self.setMesh(mesh, meshData)"
+            yield "    self.setMesh(mesh, meshData, object)"
         elif self.meshDataType == "BMESH":
-            if s["BMesh"].isUsed:        yield "    self.setBMesh(mesh, bm)"
+            yield "    self.setBMesh(mesh, bm)"
         elif self.meshDataType == "VERTICES":
-            if s["Vertices"].isUsed:     yield "    self.setVertices(mesh, vertices)"
+            yield "    self.setVertices(mesh, vertices)"
 
         yield "    if self.ensureAnimationData:"
         yield "        self.ensureThatMeshHasAnimationData(mesh)"
 
-        if s["Material Indices"].isUsed: yield "    self.setMaterialIndices(mesh, materialIndices)"
+    def isInputUsed(self):
+        if self.meshDataType == "MESH_DATA":
+            return self.inputs["Mesh"].isUsed
+        elif self.meshDataType == "BMESH":
+            return self.inputs["BMesh"].isUsed
+        elif self.meshDataType == "VERTICES":
+            return self.inputs["Vertices"].isUsed
+        else:
+            return False
 
     def isValidObject(self, object):
         if object is None: return False
@@ -99,7 +112,7 @@ class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
             return False
         return True
 
-    def setMesh(self, outMesh, mesh):
+    def setMesh(self, outMesh, mesh, object):
         # clear existing mesh
         bmesh.new().to_mesh(outMesh)
 
@@ -122,18 +135,57 @@ class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
         outMesh.loops.foreach_set("vertex_index", mesh.polygons.indices.asMemoryView())
         outMesh.loops.foreach_set("edge_index", mesh.getLoopEdges().asMemoryView())
 
+        # Materials Indices
+        materialIndices = mesh.getBuiltInAttribute("Material Indices")
+        if materialIndices is not None:
+            indices = materialIndices.data
+            if len(indices) > 0 and indices.getMaxValue() > 0 and indices.getMinValue() >= 0:
+                indices = UShortList.fromValues(indices)
+                outMesh.polygons.foreach_set("material_index", indices.asMemoryView())
+
         # UV Maps
-        for name, data in mesh.getUVMaps():
-            outMesh.uv_layers.new(name = name)
-            outMesh.uv_layers[name].data.foreach_set("uv", data.asMemoryView())
+        for attribute in mesh.iterUVMapAttributes():
+            uvLayer = outMesh.uv_layers.new(name = attribute.name, do_init = False)
+            uvLayer.data.foreach_set("uv", attribute.data.asMemoryView())
 
         # Vertex Color Layers
-        for name, data in mesh.getVertexColorLayers():
-            outMesh.vertex_colors.new(name = name)
-            outMesh.vertex_colors[name].data.foreach_set("color", data.asMemoryView())
+        for attribute in mesh.iterVertexColorAttributes():
+            vertexColorLayer = outMesh.vertex_colors.new(name = attribute.name, do_init = False)
+            vertexColorLayer.data.foreach_set("color", attribute.data.asMemoryView())
+
+        # Vertex Groups
+        vertexAmount = len(outMesh.vertices)
+        for attribute in mesh.iterVertexWeightAttributes():
+            vertexGroup = object.vertex_groups.get(attribute.name)
+            if vertexGroup is None:
+                vertexGroup = object.vertex_groups.new(name = attribute.name)
+            weights = attribute.data
+            for i in range(vertexAmount):
+                vertexGroup.add([i], weights[i], "REPLACE")
+        object.data.update()
+
+        # Custom Attributes
+        for attribute in mesh.iterCustomAttributes():
+            domain = attribute.getDomainAsString()
+            dataType = attribute.getListTypeAsString()
+            data = attribute.data
+
+            attributeOut = outMesh.attributes.new(attribute.name, dataType, domain)
+
+            if dataType in ("FLOAT", "INT", "INT32_2D"):
+                attributeOut.data.foreach_set("value", data.asMemoryView())
+            elif dataType in ("FLOAT2", "FLOAT_VECTOR"):
+                attributeOut.data.foreach_set("vector", data.asMemoryView())
+            elif dataType == "BOOLEAN":
+                attributeOut.data.foreach_set("value", numpy.not_equal(data.asNumpyArray(), b'\0'))
+            else:
+                attributeOut.data.foreach_set("color", data.asMemoryView())
 
         if self.validateMesh:
             outMesh.validate(verbose = self.validateMeshVerbose)
+
+        if self.calculateLooseEdges:
+            outMesh.update(calc_edges_loose = True)
 
     def setBMesh(self, mesh, bm):
         bm.to_mesh(mesh)
@@ -145,20 +197,6 @@ class MeshObjectOutputNode(bpy.types.Node, AnimationNode):
 
         mesh.vertices.foreach_set("co", vertices.asMemoryView())
         mesh.update()
-
-    def setMaterialIndices(self, mesh, materialIndices):
-        if len(materialIndices) == 0: return
-        if len(mesh.polygons) == 0: return
-        if materialIndices.containsValueLowerThan(0):
-            self.setErrorMessage("Material indices have to be greater or equal to zero.")
-            return
-
-        allMaterialIndices = UShortList.fromValues(materialIndices)
-        if len(materialIndices) != len(mesh.polygons):
-            allMaterialIndices = allMaterialIndices.repeated(length = len(mesh.polygons))
-
-        mesh.polygons.foreach_set("material_index", allMaterialIndices.asMemoryView())
-        mesh.polygons[0].material_index = materialIndices[0]
 
     def ensureThatMeshHasAnimationData(self, mesh):
         if not isAnimated(mesh):

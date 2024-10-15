@@ -11,26 +11,33 @@ def importDataStructures():
     from . lists.base_lists import (
         Vector3DList, Vector2DList, Matrix4x4List, EdgeIndicesList, EulerList, ColorList,
         BooleanList, FloatList, DoubleList, LongList, IntegerList, UShortList, CharList,
-        QuaternionList, UIntegerList, ShortList, UShortList
+        QuaternionList, UIntegerList, ShortList, UShortList, Int2List
     )
 
     from . virtual_list.virtual_list import VirtualList, VirtualPyList
     from . virtual_list.virtual_clists import (
         VirtualVector3DList, VirtualMatrix4x4List, VirtualEulerList, VirtualBooleanList,
         VirtualFloatList, VirtualDoubleList, VirtualLongList, VirtualColorList,
-        VirtualVector2DList
+        VirtualVector2DList, VirtualQuaternionList, VirtualInt2List
     )
 
     from . splines.base_spline import Spline
     from . splines.poly_spline import PolySpline
     from . splines.bezier_spline import BezierSpline
     from . default_lists.c_default_list import CDefaultList
+    from . attributes.attribute import Attribute
+    from . attributes.attribute import AttributeType
+    from . attributes.attribute import AttributeDomain
+    from . attributes.attribute import AttributeDataType
     from . interpolation import Interpolation
     from . falloffs.falloff_base import Falloff, BaseFalloff, CompoundFalloff
 
     from . sounds.sound import Sound
     from . sounds.sound_data import SoundData
     from . sounds.sound_sequence import SoundSequence
+
+    from . midi.midi_note import MIDINote
+    from . midi.midi_track import MIDITrack
 
     from . action import (
         Action, ActionEvaluator, ActionChannel,

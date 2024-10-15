@@ -1,7 +1,7 @@
 import bpy
 from ... base_types import AnimationNode, VectorizedSocket
 
-class FindNearestSurfacePointNode(bpy.types.Node, AnimationNode):
+class FindNearestSurfacePointNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_FindNearestSurfacePointNode"
     bl_label = "Find Nearest Surface Point"
     bl_width_default = 160
@@ -10,7 +10,7 @@ class FindNearestSurfacePointNode(bpy.types.Node, AnimationNode):
     useVectorList: VectorizedSocket.newProperty()
 
     def create(self):
-        self.newInput("BVHTree", "BVHTree", "bvhTree")
+        self.newInput("BVHTree", "BVHTree", "bvhTree", defaultDrawType = "PROPERTY_ONLY")
 
         self.newInput(VectorizedSocket("Vector", "useVectorList",
             ("Vector", "vector"), ("Vectors", "vectors")))

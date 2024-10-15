@@ -26,7 +26,7 @@ sourceTypeItems = [
 ]
 
 extractionTypeItems = [
-    ("DEFAULT", "Default", "Use polygon center and first edge as basis.", "NONE", 0),
+    ("DEFAULT", "Default", "Use polygon center and first edge as basis", "NONE", 0),
     ("EDGE", "Edge", "Use one of the edges as basis", "NONE", 1)
 ]
 
@@ -47,7 +47,7 @@ distanceTypeItems = [
     ("FURTHEST", "Furthest", "", "NONE", 1)
 ]
 
-class ExtractPolygonTransformsNode(bpy.types.Node, AnimationNode):
+class ExtractPolygonTransformsNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_ExtractPolygonTransformsNode"
     bl_label = "Extract Polygon Transforms"
     errorHandlingType = "EXCEPTION"

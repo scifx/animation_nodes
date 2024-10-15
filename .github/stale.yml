@@ -5,6 +5,8 @@ daysUntilClose: 7
 exemptLabels:
   - bug
   - proposal
+  - pending
+  - to-do
 
 staleLabel: stale
 

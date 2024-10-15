@@ -8,7 +8,7 @@ from . subprogram_base import SubprogramBaseNode
 from ... utils.nodes import newNodeAtCursor, invokeTranslation
 from . subprogram_sockets import SubprogramData, subprogramInterfaceChanged
 
-class GroupInputNode(bpy.types.Node, AnimationNode, SubprogramBaseNode):
+class GroupInputNode(AnimationNode, bpy.types.Node, SubprogramBaseNode):
     bl_idname = "an_GroupInputNode"
     bl_label = "Group Input"
     bl_width_default = 180
@@ -33,7 +33,10 @@ class GroupInputNode(bpy.types.Node, AnimationNode, SubprogramBaseNode):
         col.label(text = "Parameter Defaults:")
         box = col.box()
         for socket in list(self.outputs)[:-1]:
-            socket.drawSocket(box, socket.text, node = self, drawType = "TEXT_PROPERTY_OR_NONE")
+            subBox = box.box()
+            subBox.label(text = repr(socket.text))
+            socket.drawSocket(subBox, "Default", node = self, drawType = "PROPERTY_ONLY")
+            subBox.prop(socket.subprogram, "hideByDefault", text = "Hide")
 
     def drawControlSocket(self, layout, socket):
         left, right = splitAlignment(layout)

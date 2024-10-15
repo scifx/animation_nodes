@@ -1,6 +1,7 @@
 import traceback
 from .. import tree_info
 from .. utils.timing import measureTime
+from .. tree_info import getNodesByType, getNetworkByIdentifier
 from .. utils.nodes import (
     iterAnimationNodes,
     getAnimationNodeTrees,
@@ -9,6 +10,10 @@ from .. utils.nodes import (
 
 @measureTime
 def updateFile():
+    tree_info.updateIfNecessary()
+
+    resetOutdatedInvokeNodes()
+
     removeUndefinedSockets()
 
     socketProperties = getSocketProperties()
@@ -29,6 +34,17 @@ def updateFile():
     for node in iterAnimationNodes():
         node.updateNode()
         tree_info.updateIfNecessary()
+
+
+# Reset Outdated Invoke Nodes
+##############################################
+
+# It is possible that an invoke node have a subprogram identifier of a
+# subprogram that no longer exists. So reset those nodes.
+def resetOutdatedInvokeNodes():
+    for node in getNodesByType("an_InvokeSubprogramNode"):
+        if getNetworkByIdentifier(node.subprogramIdentifier) is None:
+            node.subprogramIdentifier = ""
 
 
 # Undefined Sockets
@@ -118,3 +134,22 @@ def getSocketByIdentifier(sockets, identifier):
     for socket in sockets:
         if socket.identifier == identifier:
             return socket
+
+############
+# Versioning
+############
+
+def runVersioning():
+    runVersioningSceneChanged()
+
+# The "sceneUpdate" property of AutoExecutionProperties was deprecated, its function was identical
+# to that of the newly added "always" property. For files where the "always" property is not set,
+# that is, files that were saved before this change, we set the value of the "always" property to
+# that of the deprecated "sceneUpdate" property. Additionally, since the newly added "sceneChanged"
+# property is functionally somewhat similar to the "always" property, we also set its value to that
+# of the deprecated "sceneUpdate" property.
+def runVersioningSceneChanged():
+    for tree in getAnimationNodeTrees():
+        if tree.autoExecution.is_property_set("always"): continue
+        tree.autoExecution.always = tree.autoExecution.sceneUpdate
+        tree.autoExecution.sceneChanged = tree.autoExecution.sceneUpdate

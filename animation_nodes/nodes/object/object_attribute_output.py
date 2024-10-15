@@ -4,7 +4,7 @@ from ... utils.code import isCodeValid
 from ... events import executionCodeChanged
 from ... base_types import AnimationNode, VectorizedSocket
 
-class ObjectAttributeOutputNode(bpy.types.Node, AnimationNode):
+class ObjectAttributeOutputNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_ObjectAttributeOutputNode"
     bl_label = "Object Attribute Output"
     bl_width_default = 180
@@ -31,6 +31,9 @@ class ObjectAttributeOutputNode(bpy.types.Node, AnimationNode):
             ("Object", "object", dict(defaultDrawType = "PROPERTY_ONLY")),
             ("Objects", "objects")))
 
+        self.inputs[1].useIsUsedProperty = True
+        self.inputs[1].isUsed = True
+
     def draw(self, layout):
         col = layout.column()
         col.prop(self, "attribute", text = "")
@@ -44,6 +47,7 @@ class ObjectAttributeOutputNode(bpy.types.Node, AnimationNode):
             yield "self.setErrorMessage('Invalid Syntax', show = len(self.attribute.strip()) > 0)"
             return
 
+        if not self.inputs[1].isUsed: return
         yield "try:"
         if self.useObjectList:
             if self.useValueList:

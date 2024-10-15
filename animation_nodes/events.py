@@ -1,6 +1,7 @@
 import bpy
 from . import tree_info
 from . import event_handler
+from . update import updateEverything
 from . utils.handlers import eventHandler
 from . execution.measurements import resetMeasurements
 
@@ -38,6 +39,27 @@ def frameChanged(scene, depsgraph):
     event_handler.update(event.getActives().union({"Frame"}))
     evaluatedDepsgraph = None
 
+# This handler is only defined as a workaround for a limitation in Blender, where the frame changed
+# handler doesn't execute if a scene is not being rendered during the rendering pipeline, for
+# instance, when a sequence editor is active and doesn't reference a scene sequence strip. So in
+# this handler, we call the update handler as a frame update if we determine that the frame changed
+# handler will not run due to the aforementioned reasons.
+@eventHandler("RENDER_PRE")
+def renderPre(scene):
+    if not scene.render.use_sequencer or scene.sequence_editor is None: return
+    for sequence in scene.sequence_editor.sequences_all:
+        if sequence.type != "SCENE": continue
+        if sequence.frame_final_start <= scene.frame_current <= sequence.frame_final_end: return
+
+    event_handler.update(event.getActives().union({"Frame"}))
+
+@eventHandler("DEPSGRAPH_UPDATE_POST")
+def sceneChanged(scene, depsgraph):
+    global evaluatedDepsgraph
+    evaluatedDepsgraph = depsgraph
+    event_handler.update(event.getActives().union({"Scene"}))
+    evaluatedDepsgraph = None
+
 def propertyChanged(self = None, context = None):
     event.propertyChanged = True
     resetMeasurements()
@@ -52,10 +74,20 @@ def fileLoaded():
     event.fileChanged = True
     treeChanged()
 
+    # Always handler doesn't work when in background mode. Update everything
+    # here instead to facilitate manual tree execution.
+    if bpy.app.background:
+        updateEverything()
+
 @eventHandler("ADDON_LOAD_POST")
 def addonChanged():
     event.addonChanged = True
     treeChanged()
+
+@eventHandler("VERSION_UPDATE")
+def versioningDone():
+    from . base_types.update_file import runVersioning
+    runVersioning()
 
 def executionCodeChanged(self = None, context = None):
     treeChanged()

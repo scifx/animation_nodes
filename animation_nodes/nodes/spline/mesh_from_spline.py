@@ -1,14 +1,14 @@
 import bpy
 from bpy.props import *
-from ... data_structures import Mesh
 from ... base_types import AnimationNode
 from . c_utils import getMatricesAlongSpline
+from ... data_structures import Mesh
 from .. mesh.c_utils import getReplicatedVertices
 from . spline_evaluation_base import SplineEvaluationBase
 from ... algorithms.mesh_generation.circle import getPointsOnCircle
 from ... algorithms.mesh_generation.grid import quadEdges, quadPolygons
 
-class MeshFromSplineNode(bpy.types.Node, AnimationNode, SplineEvaluationBase):
+class MeshFromSplineNode(AnimationNode, bpy.types.Node, SplineEvaluationBase):
     bl_idname = "an_MeshFromSplineNode"
     bl_label = "Mesh from Spline"
     bl_width_default = 160
@@ -82,5 +82,8 @@ class MeshFromSplineNode(bpy.types.Node, AnimationNode, SplineEvaluationBase):
         if capEnds and not spline.cyclic and len(shape) > 2:
             allPolygons.append(tuple(range(len(shape))))
             allPolygons.append(tuple(reversed(range((amount - 1) * len(shape), amount * len(shape)))))
+            if not closedShape:
+                allEdges.append((0, len(shape) - 1))
+                allEdges.append(((amount - 1) * len(shape), amount * len(shape) - 1))
 
         return Mesh(allVertices, allEdges, allPolygons, skipValidation = True)

@@ -4,8 +4,8 @@ from libc.string cimport memcpy
 from numpy.polynomial import Polynomial
 from ... utils.lists cimport findListSegment_LowLevel
 from ... math cimport (
-    subVec3, normalizeVec3_InPlace, lengthVec3,
-    toPyVector3, mixVec3, isCloseVec3
+    subVec3, normalizeVec3_InPlace, lengthVec3, crossVec3,
+    toPyVector3, mixVec3, isCloseVec3, lengthSquaredVec3,
 )
 
 from mathutils import Vector
@@ -23,7 +23,8 @@ cdef class BezierSpline(Spline):
                         Vector3DList rightHandles = None,
                         FloatList radii = None,
                         FloatList tilts = None,
-                        bint cyclic = False):
+                        bint cyclic = False,
+                        long materialIndex = 0):
         if points is None: points = Vector3DList()
         if leftHandles is None: leftHandles = points.copy()
         if rightHandles is None: rightHandles = points.copy()
@@ -39,6 +40,7 @@ cdef class BezierSpline(Spline):
         self.radii = radii
         self.tilts = tilts
         self.cyclic = cyclic
+        self.materialIndex = materialIndex
         self.type = "BEZIER"
         self.markChanged()
 
@@ -47,7 +49,8 @@ cdef class BezierSpline(Spline):
         f"""AN Spline Object:
         Points: {self.points.length}
         Type: {self.type}
-        Cyclic: {self.cyclic}""")
+        Cyclic: {self.cyclic}
+        Material Index: {self.materialIndex}""")
 
     cpdef void markChanged(self):
         Spline.markChanged(self)
@@ -70,7 +73,8 @@ cdef class BezierSpline(Spline):
                             self.rightHandles.copy(),
                             self.radii.copy(),
                             self.tilts.copy(),
-                            self.cyclic)
+                            self.cyclic,
+                            self.materialIndex)
 
     def transform(self, matrix):
         self.points.transform(matrix)
@@ -188,6 +192,12 @@ cdef class BezierSpline(Spline):
         getSegmentData_Parameter(self, parameter, &t, w)
         evaluateBezierSegment_Tangent(result, t, w)
 
+    cdef float evaluateCurvature_LowLevel(self, float parameter):
+        cdef float t
+        cdef Vector3* w[4]
+        getSegmentData_Parameter(self, parameter, &t, w)
+        return evaluateBezierSegment_Curvature(t, w)
+
     cdef float evaluateRadius_LowLevel(self, float parameter):
         cdef long indices[2]
         cdef float t
@@ -206,7 +216,7 @@ cdef class BezierSpline(Spline):
         smoothPoint(self, index, strength)
         self.markChanged()
 
-    cpdef BezierSpline getTrimmedCopy_LowLevel(self, float start, float end):
+    cdef BezierSpline getTrimmedCopy_LowLevel(self, float start, float end):
         cdef:
             long startIndices[2]
             long endIndices[2]
@@ -305,7 +315,7 @@ cdef class BezierSpline(Spline):
         _newTilts[0] = _oldTilts[startIndices[0]] * (1 - startT) + _oldTilts[startIndices[1]] * startT
         _newTilts[newPointAmount - 1] = _oldTilts[endIndices[0]] * (1 - endT) + _oldTilts[endIndices[1]] * endT
 
-        return BezierSpline(newPoints, newLeftHandles, newRightHandles, newRadii, newTilts)
+        return BezierSpline(newPoints, newLeftHandles, newRightHandles, newRadii, newTilts, False, self.materialIndex)
 
     def improveStraightBezierSegments(self):
         cdef Py_ssize_t i
@@ -482,3 +492,20 @@ cdef inline void evaluateBezierSegment_Tangent(Vector3 *result, float t, Vector3
     result.x = w[0].x*coeff0 + w[1].x*coeff1 + w[2].x*coeff2 + w[3].x*coeff3
     result.y = w[0].y*coeff0 + w[1].y*coeff1 + w[2].y*coeff2 + w[3].y*coeff3
     result.z = w[0].z*coeff0 + w[1].z*coeff1 + w[2].z*coeff2 + w[3].z*coeff3
+
+cdef inline void evaluateBezierSegment_Normal(Vector3 *result, float t, Vector3 **w):
+    result.x = 6 * (1 - t) * (w[2].x - 2 * w[1].x + w[0].x) + 6 * t * (w[3].x - 2 * w[2].x + w[1].x)
+    result.y = 6 * (1 - t) * (w[2].y - 2 * w[1].y + w[0].y) + 6 * t * (w[3].y - 2 * w[2].y + w[1].y)
+    result.z = 6 * (1 - t) * (w[2].z - 2 * w[1].z + w[0].z) + 6 * t * (w[3].z - 2 * w[2].z + w[1].z)
+
+@cython.cdivision(True)
+cdef inline float evaluateBezierSegment_Curvature(float t, Vector3 **w):
+    cdef Vector3 tangent
+    evaluateBezierSegment_Tangent(&tangent, t, w)
+    cdef Vector3 normal
+    evaluateBezierSegment_Normal(&normal, t, w)
+    cdef Vector3 cross
+    crossVec3(&cross, &tangent, &normal)
+    cdef float crossLength = lengthVec3(&cross)
+    cdef float tangentLengthSquared = lengthSquaredVec3(&tangent)
+    return crossLength / (tangentLengthSquared ** 1.5)

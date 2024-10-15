@@ -19,7 +19,7 @@ oneTimeCache = {}
 frameBasedCache = {}
 inputBasedCache = {}
 
-class InvokeSubprogramNode(bpy.types.Node, AnimationNode):
+class InvokeSubprogramNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_InvokeSubprogramNode"
     bl_label = "Invoke Subprogram"
     bl_width_default = 160
@@ -196,7 +196,7 @@ class ChangeSubprogram(bpy.types.Operator):
             node = getNodeByIdentifier(self.nodeIdentifier)
             self.subprogram = node.subprogramIdentifier
         except: pass # when the old subprogram identifier doesn't exist
-        return context.window_manager.invoke_props_dialog(self, width = 400 * getDpiFactor())
+        return context.window_manager.invoke_props_dialog(self, width = int(400 * getDpiFactor()))
 
     def check(self, context):
         return True

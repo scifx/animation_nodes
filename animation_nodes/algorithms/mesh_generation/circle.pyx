@@ -3,7 +3,7 @@ from libc.math cimport M_PI as PI
 from ... data_structures.meshes.validate import createValidEdgesList
 from ... data_structures cimport (
     Vector3DList, EdgeIndicesList, PolygonIndicesList,
-    Mesh, VirtualDoubleList, VirtualLongList
+    Mesh, VirtualDoubleList, VirtualLongList, LongList,
 )
 
 

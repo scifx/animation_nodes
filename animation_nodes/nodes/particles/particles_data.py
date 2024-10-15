@@ -17,7 +17,7 @@ particleAttributes = [
 outputsData = [(type, name, identifier) for name, identifier, _, type, *_ in particleAttributes]
 executionData = [(identifier, attribute, CListType) for _, identifier, attribute, _, CListType in particleAttributes]
 
-class ParticleSystemParticlesDataNode(bpy.types.Node, AnimationNode):
+class ParticleSystemParticlesDataNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_ParticleSystemParticlesDataNode"
     bl_label = "Particles Data"
 
@@ -62,7 +62,7 @@ class ParticleSystemParticlesDataNode(bpy.types.Node, AnimationNode):
 
         yield "for system in particleSystems:"
         yield "    if system is None: continue"
-        yield "    if system.settings.type != 'EMITTER': continue"
+        yield "    if system.settings.type not in ('EMITTER', 'FLIP'): continue"
 
         yield "    _mask = self.getParticlesMask(system.particles)"
         for identifier, attribute, CListType in executionData:

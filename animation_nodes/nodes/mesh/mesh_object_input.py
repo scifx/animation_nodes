@@ -1,9 +1,9 @@
 import bpy
 from bpy.props import *
-from ... data_structures import Mesh
 from ... base_types import AnimationNode, VectorizedSocket
+from ... data_structures import Mesh, Attribute, AttributeType, AttributeDomain, AttributeDataType, DoubleList
 
-class MeshObjectInputNode(bpy.types.Node, AnimationNode):
+class MeshObjectInputNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_MeshObjectInputNode"
     bl_label = "Mesh Object Input"
     errorHandlingType = "MESSAGE"
@@ -15,6 +15,8 @@ class MeshObjectInputNode(bpy.types.Node, AnimationNode):
         self.newInput("Boolean", "Use Modifiers", "useModifiers", value = False)
         self.newInput("Boolean", "Load UVs", "loadUVs", value = False, hide = True)
         self.newInput("Boolean", "Load Vertex Colors", "loadVertexColors", value = False, hide = True)
+        self.newInput("Boolean", "Load Vertex Weights", "loadVertexWeights", value = False, hide = True)
+        self.newInput("Boolean", "Load Custom Attributes", "loadCustomAttributes", value = False, hide = True)
         self.newInput("Scene", "Scene", "scene", hide = True)
 
         self.newOutput("Mesh", "Mesh", "mesh")
@@ -29,10 +31,14 @@ class MeshObjectInputNode(bpy.types.Node, AnimationNode):
         self.newOutput("Polygon Indices List", "Polygon Indices", "polygonIndices")
 
         self.newOutput("Float List", "Local Polygon Areas", "localPolygonAreas")
+
         self.newOutput("Integer List", "Material Indices", "materialIndices")
+        self.newOutput("Float List", "Bevel Vertex Weights", "bevelVertexWeights")
+        self.newOutput("Float List", "Bevel Edge Weights", "bevelEdgeWeights")
+        self.newOutput("Float List", "Edge Creases", "edgeCreases")
 
         self.newOutput("Text", "Mesh Name", "meshName")
-        
+
         visibleOutputs = ("Mesh", "Vertex Locations", "Polygon Centers")
         for socket in self.outputs:
             socket.hide = socket.name not in visibleOutputs
@@ -59,14 +65,17 @@ class MeshObjectInputNode(bpy.types.Node, AnimationNode):
         yield "    polygonCenters = Vector3DList()"
         yield "    localPolygonAreas = DoubleList()"
         yield "    materialIndices = LongList()"
+        yield "    bevelVertexWeights = DoubleList()"
+        yield "    bevelEdgeWeights = DoubleList()"
+        yield "    edgeCreases = DoubleList()"
 
     def iterGetMeshDataCodeLines(self, required):
         if "meshName" in required:
             yield "meshName = sourceMesh.name"
-        
+
         yield "evaluatedObject = AN.utils.depsgraph.getEvaluatedID(object)"
         meshRequired = "mesh" in required
-        
+
         if "vertexLocations" in required or meshRequired:
             yield "vertexLocations = self.getVertexLocations(sourceMesh, evaluatedObject, useWorldSpace)"
         if "edgeIndices" in required or meshRequired:
@@ -81,16 +90,25 @@ class MeshObjectInputNode(bpy.types.Node, AnimationNode):
             yield "polygonCenters = self.getPolygonCenters(sourceMesh, evaluatedObject, useWorldSpace)"
         if "localPolygonAreas" in required:
             yield "localPolygonAreas = DoubleList.fromValues(sourceMesh.an.getPolygonAreas())"
-        if "materialIndices" in required:
+        if "materialIndices" in required or meshRequired:
             yield "materialIndices = LongList.fromValues(sourceMesh.an.getPolygonMaterialIndices())"
+        if "bevelVertexWeights" in required or meshRequired:
+            yield "bevelVertexWeights = DoubleList.fromValues(sourceMesh.an.getBevelVertexWeights())"
+        if "bevelEdgeWeights" in required or meshRequired:
+            yield "bevelEdgeWeights = DoubleList.fromValues(sourceMesh.an.getBevelEdgeWeights())"
+        if "edgeCreases" in required or meshRequired:
+            yield "edgeCreases = DoubleList.fromValues(sourceMesh.an.getEdgeCreases())"
 
         if meshRequired:
             yield "mesh = Mesh(vertexLocations, edgeIndices, polygonIndices)"
             yield "mesh.setVertexNormals(vertexNormals)"
             yield "mesh.setPolygonNormals(polygonNormals)"
             yield "mesh.setLoopEdges(sourceMesh.an.getLoopEdges())"
-            yield "if loadUVs: self.loadUVs(mesh, sourceMesh, object)"
+            yield "self.loadBuiltInAttributes(mesh, sourceMesh, evaluatedObject)"
+            yield "if loadUVs: self.loadUVMaps(mesh, sourceMesh, object)"
             yield "if loadVertexColors: self.loadVertexColors(mesh, sourceMesh, object)"
+            yield "if loadVertexWeights: self.loadVertexWeights(mesh, sourceMesh, object, useModifiers, scene)"
+            yield "if loadCustomAttributes: self.loadCustomAttributes(mesh, sourceMesh, evaluatedObject)"
 
     def getVertexLocations(self, mesh, object, useWorldSpace):
         vertices = mesh.an.getVertices()
@@ -116,17 +134,93 @@ class MeshObjectInputNode(bpy.types.Node, AnimationNode):
             centers.transform(object.matrix_world)
         return centers
 
-    def loadUVs(self, mesh, sourceMesh, object):
-        if object.mode == "OBJECT":
-            for uvMapName in sourceMesh.uv_layers.keys():
-                mesh.insertUVMap(uvMapName, sourceMesh.an.getUVMap(uvMapName))
-        else:
-            self.setErrorMessage("Object has to be in object mode to load UV maps.")
-    
-    def loadVertexColors(self, mesh, sourceMesh, object):
+    def loadBuiltInAttributes(self, mesh, sourceMesh, object):
         if object.mode != "EDIT":
-            for colorLayerName in sourceMesh.vertex_colors.keys():
-                mesh.insertVertexColorLayer(colorLayerName, sourceMesh.an.getVertexColorLayer(colorLayerName))
+            mesh.insertBuiltInAttribute(Attribute("Material Indices",
+                                                  AttributeType.MATERIAL_INDEX,
+                                                  AttributeDomain.FACE,
+                                                  AttributeDataType.INT,
+                                                  sourceMesh.an.getPolygonMaterialIndices()))
+
+            mesh.insertBuiltInAttribute(Attribute("Bevel Edge Weights",
+                                                  AttributeType.BEVEL_EDGE_WEIGHT,
+                                                  AttributeDomain.EDGE,
+                                                  AttributeDataType.FLOAT,
+                                                  sourceMesh.an.getBevelEdgeWeights()))
+
+            mesh.insertBuiltInAttribute(Attribute("Bevel Vertex Weights",
+                                                  AttributeType.BEVEL_VERTEX_WEIGHT,
+                                                  AttributeDomain.POINT,
+                                                  AttributeDataType.FLOAT,
+                                                  sourceMesh.an.getBevelVertexWeights()))
+
+            mesh.insertBuiltInAttribute(Attribute("Edge Creases",
+                                                  AttributeType.EDGE_CREASE,
+                                                  AttributeDomain.EDGE,
+                                                  AttributeDataType.FLOAT,
+                                                  sourceMesh.an.getEdgeCreases()))
+
         else:
             self.setErrorMessage("Object is in edit mode.")
 
+    def loadUVMaps(self, mesh, sourceMesh, object):
+        if object.mode != "EDIT":
+            for uvMapName in sourceMesh.uv_layers.keys():
+                mesh.insertUVMapAttribute(Attribute(uvMapName,
+                                                    AttributeType.UV_MAP,
+                                                    AttributeDomain.CORNER,
+                                                    AttributeDataType.FLOAT2,
+                                                    sourceMesh.an.getUVMap(uvMapName)))
+        else:
+            self.setErrorMessage("Object is in edit mode.")
+
+    def loadVertexColors(self, mesh, sourceMesh, object):
+        if object.mode != "EDIT":
+            for colorLayerName in sourceMesh.vertex_colors.keys():
+                mesh.insertVertexColorAttribute(Attribute(colorLayerName,
+                                                          AttributeType.VERTEX_COLOR,
+                                                          AttributeDomain.CORNER,
+                                                          AttributeDataType.BYTE_COLOR,
+                                                          sourceMesh.an.getVertexColorLayer(colorLayerName)))
+        else:
+            self.setErrorMessage("Object is in edit mode.")
+
+    def loadVertexWeights(self, mesh, sourceMesh, object, useModifiers, scene):
+        if object.mode != "EDIT":
+            vertexGroups = object.vertex_groups
+            for vertexGroupName in vertexGroups.keys():
+                if useModifiers:
+                    weights = DoubleList(length = len(mesh.vertices))
+                    weights.fill(0)
+                else:
+                    weights = self.execute_All_WithoutModifiers(mesh, vertexGroups[vertexGroupName])
+                mesh.insertVertexWeightAttribute(Attribute(vertexGroupName,
+                                                           AttributeType.VERTEX_WEIGHT,
+                                                           AttributeDomain.POINT,
+                                                           AttributeDataType.FLOAT,
+                                                           weights))
+        else:
+            self.setErrorMessage("Object is in edit mode.")
+
+    def loadCustomAttributes(self, mesh, sourceMesh, object):
+        if object.mode != "EDIT":
+            attributes = sourceMesh.attributes
+            for customAttributeName in attributes.keys():
+                attribute = attributes.get(customAttributeName)
+                mesh.insertCustomAttribute(Attribute(customAttributeName,
+                                                     AttributeType.CUSTOM,
+                                                     AttributeDomain[attribute.domain],
+                                                     AttributeDataType[attribute.data_type],
+                                                     sourceMesh.an.getCustomAttribute(customAttributeName)))
+        else:
+            self.setErrorMessage("Object is in edit mode.")
+
+    def execute_All_WithoutModifiers(self, mesh, vertexGroup):
+        vertexAmount = len(mesh.vertices)
+        weights = DoubleList(length = vertexAmount)
+        getWeight = vertexGroup.weight
+
+        for i in range(vertexAmount):
+            try: weights[i] = getWeight(i)
+            except: weights[i] = 0
+        return weights

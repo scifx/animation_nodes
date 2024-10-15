@@ -1,10 +1,10 @@
 import bpy
 from bpy.props import *
 from ... base_types import AnimationNode
-from ... utils.selection import getSortedSelectedObjects
+from ... utils.selection import getSelectedObjects
 from ... sockets.info import getListDataTypes, toBaseDataType, toListDataType
 
-class CreateListNode(bpy.types.Node, AnimationNode):
+class CreateListNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_CreateListNode"
     bl_label = "Create List"
     dynamicLabelType = "ALWAYS"
@@ -129,7 +129,7 @@ class CreateListNode(bpy.types.Node, AnimationNode):
             self.invokeFunction(layout, "createInputsForSelectedObjectCollections", text = "From Selection", icon = "PLUS")
 
     def createInputsForSelectedObjects(self):
-        objects = getSortedSelectedObjects()
+        objects = getSelectedObjects(bpy.context.view_layer)
         for obj in objects:
             socket = self.newInputSocket()
             socket.object = obj

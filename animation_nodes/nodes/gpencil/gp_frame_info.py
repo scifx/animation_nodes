@@ -9,7 +9,7 @@ strokeTypeItems = [
     ("INDEX", "Index Stroke ", "Get a specific stroke", "NONE", 1)
 ]
 
-class GPFrameInfoNode(bpy.types.Node, AnimationNode):
+class GPFrameInfoNode(AnimationNode, bpy.types.Node):
     bl_idname = "an_GPFrameInfoNode"
     bl_label = "GP Frame Info"
     errorHandlingType = "EXCEPTION"
@@ -30,7 +30,7 @@ class GPFrameInfoNode(bpy.types.Node, AnimationNode):
 
             self.newOutput(VectorizedSocket("GPStroke", "useIntegerList",
             ("Stroke", "stroke"), ("Strokes", "strokes")))
-        self.newOutput("Float", "Frame Number", "frameNumber")
+        self.newOutput("Integer", "Frame Number", "frameNumber")
 
     def draw(self, layout):
         layout.prop(self, "strokeType", text = "")
