@@ -2,6 +2,16 @@
 
 ### Added
 
+### Fixed
+
+- Fixed Sequence sockets for recent API change.
+
+### Changed
+
+## 2.3 (25 January 2025)
+
+### Added
+
 - Added support for splines in *3D Viewer* node.
 - Added built-in attributes for Mesh object.
 - Added Vertex Group as attribute for Mesh object.
